@@ -143,18 +143,25 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         if (now - lastZombieSpawn > spawnInterval) {
             lastZombieSpawn = now;
             int row = (int)(Math.random() * Constants.ROWS);
-            Zombie.Type type;
+            int zType;
             double r = Math.random();
             if (wave <= 2) {
-                type = Zombie.Type.NORMAL;
+                zType = Zombie.TEMPLATE_NORMAL;
             } else if (wave <= 4) {
-                type = r < 0.75 ? Zombie.Type.NORMAL : Zombie.Type.FAST;
+                zType = r < 0.75 ? Zombie.TEMPLATE_NORMAL : Zombie.TEMPLATE_FAST;
             } else {
-                type = r < 0.55 ? Zombie.Type.NORMAL : r < 0.85 ? Zombie.Type.FAST : Zombie.Type.TANK;
+                zType = r < 0.55 ? Zombie.TEMPLATE_NORMAL : r < 0.85 ? Zombie.TEMPLATE_FAST : Zombie.TEMPLATE_TANK;
             }
             int maxLevel = Math.min(4, 1 + wave / 2);
             int level = 1 + (int)(Math.random() * maxLevel);
-            Zombie z = new Zombie(row, type, level);
+            Zombie z;
+            if (zType == Zombie.TEMPLATE_FAST) {
+                z = new FastZombie(row, level);
+            } else if (zType == Zombie.TEMPLATE_TANK) {
+                z = new TankZombie(row, level);
+            } else {
+                z = new NormalZombie(row, level);
+            }
             zombies.add(z);
             zombiesSpawnedThisWave++;
         }
@@ -168,8 +175,9 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
                 z.attacking = true;
                 if (now - z.lastAttackTime > Constants.ZOMBIE_ATTACK_RATE) {
                     z.lastAttackTime = now;
-                    target.hp -= Constants.ZOMBIE_DMG;
-                    addFloatText("-" + Constants.ZOMBIE_DMG, target.cx(), target.cy() - 10,
+                    int dmg = z.attackPower();
+                    target.hp -= dmg;
+                    addFloatText("-" + dmg, target.cx(), target.cy() - 10,
                             new Color(220, 60, 60), 16, 700);
                     if (target.isDead()) {
                         grid[target.row][target.col] = null;
@@ -384,8 +392,8 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
 
     private void drawDecorativePlants(Graphics2D g) {
         // Draw sample plants for decoration
-        Plant sf = new Plant(PlantType.SUNFLOWER, 0, 0);
-        sf.draw(g); // Won't render properly as decoration, use simple shapes
+        Sunflower sf = new Sunflower(0, 0);
+        sf.draw(g); // sample sunflower (may overlap grid)
         // Simple flower left
         g.setColor(new Color(255, 220, 0));
         for (int i = 0; i < 8; i++) {
@@ -784,7 +792,14 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         // Grid placement
         if (selectedPlant != null && hoverCol >= 0 && hoverRow >= 0) {
             if (grid[hoverRow][hoverCol] == null && sunCount >= selectedPlant.cost) {
-                grid[hoverRow][hoverCol] = new Plant(selectedPlant, hoverCol, hoverRow);
+                Plant newPlant = switch (selectedPlant) {
+                    case SUNFLOWER -> new Sunflower(hoverCol, hoverRow);
+                    case PEASHOOTER -> new Peashooter(hoverCol, hoverRow);
+                    case WALLNUT -> new Wallnut(hoverCol, hoverRow);
+                    case SNOWPEA -> new SnowPea(hoverCol, hoverRow);
+                    case CHERRYBOMB -> new CherryBomb(hoverCol, hoverRow);
+                };
+                grid[hoverRow][hoverCol] = newPlant;
                 sunCount -= selectedPlant.cost;
                 addFloatText("-" + selectedPlant.cost + " ☀", mx, my - 20,
                         new Color(220, 180, 50), 16, 800);
