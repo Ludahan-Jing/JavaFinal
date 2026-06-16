@@ -61,6 +61,8 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
     public GamePanel() {
         setPreferredSize(new Dimension(Constants.WINDOW_WIDTH, Constants.WINDOW_HEIGHT));
         setBackground(new Color(80, 140, 60));
+        // allow keyboard focus so ESC and other keys work
+        setFocusable(true);
         addMouseListener(this);
         addMouseMotionListener(this);
         timer = new javax.swing.Timer(16, this); // ~60fps
@@ -101,6 +103,8 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         pauseBtnEndBounds = null;
         state          = State.PLAYING;
         timer.start();
+        // ensure this panel has keyboard focus so ESC is received
+        javax.swing.SwingUtilities.invokeLater(() -> requestFocusInWindow());
     }
 
     // ── Main update ────────────────────────────────────────────────────────────
@@ -185,7 +189,13 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
                 }
             }
             int maxLevel = Math.min(4, 1 + wave / 2);
-            int level = 1 + (int)(Math.random() * maxLevel);
+            // Bias selection so higher levels become more likely as waves increase.
+            // biasFactor == 1.0 => uniform; values <1 favor larger (higher) levels.
+            double biasFactor = Math.max(0.45, 1.0 - (wave - 1) * 0.06);
+            double rnd = Math.random();
+            double biased = Math.pow(rnd, biasFactor);
+            int level = 1 + (int)(biased * maxLevel);
+            level = Math.max(1, Math.min(level, maxLevel));
             Zombie z;
             if (zType == Zombie.TEMPLATE_FAST) {
                 z = new FastZombie(row, level);
