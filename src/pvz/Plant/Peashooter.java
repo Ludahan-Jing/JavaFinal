@@ -1,6 +1,8 @@
-package pvz;
+package pvz.Plant;
 
 import java.awt.*;
+import pvz.PlantType;
+import pvz.Constants;
 
 public class Peashooter extends Plant {
     public Peashooter(int col, int row) {

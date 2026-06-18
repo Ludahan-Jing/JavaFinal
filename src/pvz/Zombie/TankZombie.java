@@ -1,10 +1,11 @@
-package pvz;
+package pvz.Zombie;
 
 import java.awt.*;
+import pvz.Constants;
 
-public class CherryZombie extends Zombie {
-    public CherryZombie(int row, int level) {
-        super(row, level, TEMPLATE_CHERRY, 'C', 250, 1.0, Constants.ZOMBIE_DMG);
+public class TankZombie extends Zombie {
+    public TankZombie(int row, int level) {
+        super(row, level, TEMPLATE_TANK, 'T', Constants.ZOMBIE_TANK_HP, 0.75, Constants.ZOMBIE_DMG);
     }
 
     @Override
@@ -13,14 +14,12 @@ public class CherryZombie extends Zombie {
         int py = getPixelY() + 5;
         boolean slowed = System.currentTimeMillis() < slowUntil;
 
-        // Use normal body colors/vars
-        Color skinColor = slowed ? new Color(140, 200, 230) : new Color(150, 200, 120);
-        Color[] shirts = new Color[]{ new Color(80, 120, 60), new Color(100, 140, 80), new Color(120, 160, 90), new Color(140, 110, 70) };
-        Color[] pants  = new Color[]{ new Color(60, 90, 40),  new Color(60, 95, 45),  new Color(60,100,50),  new Color(60,85,35) };
+        Color skinColor = slowed ? new Color(120, 170, 180) : new Color(120, 160, 120);
+        Color[] shirts = new Color[]{ new Color(110, 110, 120), new Color(120, 120, 130), new Color(140, 130, 120), new Color(90, 90, 100) };
         int idx = Math.max(0, Math.min(level - 1, shirts.length - 1));
         Color shirtColor = slowed ? shirts[idx].brighter() : shirts[idx];
-        Color pantsColor  = slowed ? pants[idx].brighter()  : pants[idx];
-        int bodyW = 34, bodyH = 22, legW = 10;
+        Color pantsColor  = slowed ? new Color(60, 70, 80).brighter() : new Color(60, 70, 80);
+        int bodyW = 40, bodyH = 26, legW = 12;
 
         drawShadow(g, px, py);
         drawLegsAndShoes(g, px, py, pantsColor, legW);
@@ -32,9 +31,9 @@ public class CherryZombie extends Zombie {
         g.setColor(shirtColor.darker());
         g.fillRect(bodyX + 2, py + 28 + bodyH - 6, Math.max(6, bodyW/6), 6);
 
-        // Arms
+        // Arms (thicker)
         g.setColor(skinColor);
-        int armW = 10;
+        int armW = 14;
         if (attacking) {
             g.fillRoundRect(px - 10, py + 28, 22, armW, 5, 5);
             g.fillRoundRect(px - 10, py + 38, 20, armW, 5, 5);
@@ -44,24 +43,17 @@ public class CherryZombie extends Zombie {
             g.fillRoundRect(px + 38, py + 30, armW, 18 - armSwing, 5, 5);
         }
 
-        // Cherry head: two cherries with stems
-        int leftX = px + 10;
-        int topY  = py - 6;
-        g.setColor(new Color(200, 30, 30));
-        g.fillOval(leftX, topY, 20, 20);
-        g.fillOval(leftX + 16, topY, 20, 20);
-        // Highlights
-        g.setColor(new Color(255, 200, 200, 160));
-        g.fillOval(leftX + 4, topY + 4, 6, 6);
-        g.fillOval(leftX + 20, topY + 4, 6, 6);
-        // Stems
-        g.setColor(new Color(60, 120, 40));
-        g.setStroke(new BasicStroke(2));
-        g.drawLine(leftX + 10, topY + 4, leftX + 8, topY - 12);
-        g.drawLine(leftX + 30, topY + 4, leftX + 34, topY - 12);
-        g.setStroke(new BasicStroke(1));
+        // Head with helmet
+        g.setColor(skinColor);
+        g.fillOval(px + 10, py + 2, 30, 28);
+        g.setColor(skinColor.darker());
+        g.drawOval(px + 10, py + 2, 30, 28);
+        g.setColor(new Color(50, 50, 60));
+        g.fillArc(px + 8, py - 2, 34, 18, 0, 180);
+        g.setColor(new Color(40, 40, 50));
+        g.drawArc(px + 8, py - 2, 34, 18, 0, 180);
 
-        // Eyes (use same face placements)
+        // Face
         g.setColor(new Color(200, 30, 30));
         g.fillOval(px + 14, py + 12, 7, 8);
         g.fillOval(px + 27, py + 14, 7, 6);

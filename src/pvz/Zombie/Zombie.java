@@ -1,6 +1,7 @@
-package pvz;
+package pvz.Zombie;
 
 import java.awt.*;
+import pvz.Constants;
 
 public abstract class Zombie {
     // Template IDs

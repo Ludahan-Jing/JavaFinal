@@ -5,6 +5,8 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
 import java.util.List;
+import pvz.Plant.*;
+import pvz.Zombie.*;
 
 public class GamePanel extends JPanel implements ActionListener, MouseListener, MouseMotionListener {
 

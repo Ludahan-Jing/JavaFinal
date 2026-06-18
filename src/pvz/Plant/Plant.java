@@ -1,6 +1,8 @@
-package pvz;
+package pvz.Plant;
 
 import java.awt.*;
+import pvz.PlantType;
+import pvz.Constants;
 
 /**
  * Abstract Plant base class with template stats: baseHp, baseAttack, idChar
