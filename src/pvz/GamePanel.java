@@ -8,7 +8,7 @@ import java.util.List;
 import pvz.Plant.*;
 import pvz.Zombie.*;
 
-public class GamePanel extends JPanel implements ActionListener, MouseListener, MouseMotionListener {
+public class GamePanel extends JPanel implements MouseListener, MouseMotionListener {
 
     // ── Game state ─────────────────────────────────────────────────────────────
     public enum State { MENU, PLAYING, PAUSED, WIN, LOSE }
@@ -39,8 +39,8 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
     private Rectangle pauseBtnEndBounds = null;
     private Point     mousePos = new Point();
 
-    // ── Timer ──────────────────────────────────────────────────────────────────
-    private final javax.swing.Timer timer;
+    // ── Game engine (controls timer & update loop) ─────────────────────────────
+    private GameEngine engine;
 
     // ── Fonts ──────────────────────────────────────────────────────────────────
     private Font bigFont, medFont, smallFont;
@@ -64,7 +64,8 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
             }
         });
 
-        timer = new javax.swing.Timer(16, this); // ~60fps
+        // engine created after world is initialized
+        engine = new GameEngine(this, world);
         initFonts();
         initWindow();
     }
@@ -80,6 +81,19 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
 
     public JFrame getFrame() {
         return frame;
+    }
+
+    // Exposed for GameEngine to inspect/control the state and timing
+    public State getState() { return state; }
+    public void setState(State s) { this.state = s; }
+    public GameWorld getWorld() { return world; }
+    public synchronized long getLastUpdate() { return lastUpdate; }
+    public synchronized void setLastUpdate(long v) { lastUpdate = v; }
+    // prepare end-screen button rectangles (used by engine when game ends)
+    public void prepareEndScreenButtons() {
+        int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
+        endBtnRestartBounds = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
+        endBtnMenuBounds = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
     }
 
     private void initFonts() {
@@ -108,44 +122,12 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         pauseBtnRestartBounds = null;
         pauseBtnEndBounds = null;
         state          = State.PLAYING;
-        timer.start();
+        engine.start();
         // ensure this panel has keyboard focus so ESC is received
         javax.swing.SwingUtilities.invokeLater(() -> requestFocusInWindow());
     }
 
-    // ── Main update ────────────────────────────────────────────────────────────
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        if (state != State.PLAYING) { repaint(); return; }
-
-        long now = System.currentTimeMillis();
-        double dt = (now - lastUpdate) / 1000.0;
-        if (dt > 0.1) dt = 0.1;
-        lastUpdate = now;
-
-        GameWorld.UpdateResult res = world.update(dt);
-        if (res == GameWorld.UpdateResult.LOSE) {
-            if (state != State.LOSE) {
-                state = State.LOSE;
-                timer.stop();
-                int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-                endBtnRestartBounds = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                endBtnMenuBounds = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                repaint();
-            }
-        } else if (res == GameWorld.UpdateResult.WIN) {
-            if (state != State.WIN) {
-                state = State.WIN;
-                timer.stop();
-                int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-                endBtnRestartBounds = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                endBtnMenuBounds = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                repaint();
-            }
-        }
-
-        repaint();
-    }
+    // Game updates are driven by GameEngine -> see src/pvz/GameEngine.java
 
     // ── Painting ───────────────────────────────────────────────────────────────
     @Override
@@ -626,10 +608,8 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
                 repaint();
             } else if (pauseBtnEndBounds != null && pauseBtnEndBounds.contains(mx, my)) {
                 state = State.LOSE;
-                timer.stop();
-                int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-                endBtnRestartBounds = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                endBtnMenuBounds = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
+                engine.stop();
+                prepareEndScreenButtons();
                 pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
                 repaint();
             }
@@ -643,7 +623,7 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
                 repaint();
             } else if (endBtnMenuBounds != null && endBtnMenuBounds.contains(mx, my)) {
                 state = State.MENU;
-                timer.stop();
+                engine.stop();
                 // clear button bounds when returning to menu
                 endBtnRestartBounds = null;
                 endBtnMenuBounds = null;
