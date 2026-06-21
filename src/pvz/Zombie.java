@@ -3,11 +3,6 @@ package pvz;
 import java.awt.*;
 
 public abstract class Zombie {
-    // Template IDs
-    public static final int TEMPLATE_NORMAL = 0;
-    public static final int TEMPLATE_FAST   = 1;
-    public static final int TEMPLATE_TANK   = 2;
-    public static final int TEMPLATE_CHERRY = 3;
     // Global HP bonus applied every 3 waves
     private static int globalHpBonus = 0;
 
@@ -18,7 +13,7 @@ public abstract class Zombie {
     public double x;          // pixel X
     public int hp;
     public int maxHp;
-    public final int templateId; // identifies the subclass/template
+    public final ZombieType type; // identifies the zombie type
     public final char idChar;    // display char (e.g. 'N','F','T')
     public final int level;
     public final int baseHp;
@@ -34,19 +29,19 @@ public abstract class Zombie {
     public static final int ZOMBIE_W = 50;
     public static final int ZOMBIE_H = 70;
 
-    protected Zombie(int row, int level, int templateId, char idChar, int baseHp, double baseSpeed, int baseAttack) {
-        this.row         = row;
-        this.x           = Constants.WINDOW_WIDTH + 20;
-        this.templateId  = templateId;
-        this.idChar      = idChar;
-        this.level       = level;
-        this.baseHp      = baseHp;
-        this.baseSpeed   = baseSpeed;
-        this.baseAttack  = baseAttack;
-        this.maxHp       = calculateHp(baseHp, level);
-        this.hp          = maxHp;
+    protected Zombie(int row, int level, ZombieType type) {
+        this.row       = row;
+        this.x         = Constants.WINDOW_WIDTH + 20;
+        this.type      = type;
+        this.idChar    = type.idChar;
+        this.level     = level;
+        this.baseHp    = type.baseHp;
+        this.baseSpeed = type.baseSpeed;
+        this.baseAttack= type.baseAttack;
+        this.maxHp     = calculateHp(baseHp, level);
+        this.hp        = maxHp;
         this.speedFactor = baseSpeed;
-        this.legPhase    = 0;
+        this.legPhase  = 0;
     }
 
     private static int calculateHp(int baseHp, int level) {
@@ -87,8 +82,8 @@ public abstract class Zombie {
         int bodyH = 22; // base body height
         int legW = 10;   // base leg width
 
-        switch (templateId) {
-            case TEMPLATE_FAST -> {
+        switch (type) {
+            case FAST -> {
                 skinColor = slowed ? new Color(160, 210, 240) : new Color(180, 220, 160);
                 Color[] shirts = new Color[]{ new Color(200, 60, 60), new Color(220, 80, 80), new Color(240, 120, 80), new Color(220, 60, 60) };
                 int idx = Math.max(0, Math.min(level - 1, shirts.length - 1));
@@ -96,7 +91,7 @@ public abstract class Zombie {
                 pantsColor  = slowed ? new Color(50, 60, 70).brighter() : new Color(50, 60, 70);
                 bodyW = 30; bodyH = 20; legW = 8; // slimmer
             }
-            case TEMPLATE_TANK -> {
+            case TANK -> {
                 skinColor = slowed ? new Color(120, 170, 180) : new Color(120, 160, 120);
                 Color[] shirts = new Color[]{ new Color(110, 110, 120), new Color(120, 120, 130), new Color(140, 130, 120), new Color(90, 90, 100) };
                 int idx = Math.max(0, Math.min(level - 1, shirts.length - 1));
@@ -137,13 +132,13 @@ public abstract class Zombie {
         // Tattered effect (slightly different for tank)
         g.setColor(shirtColor.darker());
         g.fillRect(bodyX + 2, py + 28 + bodyH - 6, Math.max(6, bodyW/6), 6);
-        if (templateId == TEMPLATE_NORMAL) {
+        if (type == ZombieType.NORMAL) {
             g.fillRect(bodyX + bodyW - 8, py + 28 + bodyH - 6, Math.max(6, bodyW/5), 4);
         }
 
         // Arms (vary thickness for tank/fast)
         g.setColor(skinColor);
-        int armW = (templateId == TEMPLATE_TANK) ? 14 : (templateId == TEMPLATE_FAST) ? 8 : 10;
+        int armW = (type == ZombieType.TANK) ? 14 : (type == ZombieType.FAST) ? 8 : 10;
         if (attacking) {
             // Arms stretched forward (to the left)
             g.fillRoundRect(px - 10, py + 28, 22, armW, 5, 5);
@@ -155,7 +150,7 @@ public abstract class Zombie {
         }
 
         // Head (cherry variant replaces normal head)
-        if (templateId == TEMPLATE_CHERRY) {
+        if (type == ZombieType.CHERRY) {
             // Cherry head: two cherries with stems
             int leftX = px + 10;
             int topY  = py - 6;
@@ -180,7 +175,7 @@ public abstract class Zombie {
             g.drawOval(px + 10, py + 2, 30, 28);
 
             // Hair / helmet variants
-            if (templateId == TEMPLATE_TANK) {
+            if (type == ZombieType.TANK) {
                 // Helmet
                 g.setColor(new Color(50, 50, 60));
                 g.fillArc(px + 8, py - 2, 34, 18, 0, 180);
@@ -202,7 +197,7 @@ public abstract class Zombie {
         g.setColor(Color.BLACK);
         g.fillOval(px + 16, py + 14, 4, 5);
         g.fillOval(px + 29, py + 15, 4, 4);
-        if (templateId == TEMPLATE_FAST) {
+        if (type == ZombieType.FAST) {
             // scar or extra eye mark
             g.setColor(new Color(180, 20, 20));
             g.drawLine(px + 12, py + 18, px + 20, py + 16);

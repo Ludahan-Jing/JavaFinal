@@ -83,4 +83,9 @@ public class Constants {
     // Pause-menu button layout
     public static final int PAUSE_BTN_FIRST_Y   = 300;
     public static final int PAUSE_BTN_GAP       = 70;
+
+    // Main menu start button
+    public static final int MENU_BTN_W = 200;
+    public static final int MENU_BTN_H = 55;
+    public static final int MENU_BTN_Y = 250;
 }

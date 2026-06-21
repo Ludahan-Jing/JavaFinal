@@ -63,6 +63,13 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         setBackground(new Color(80, 140, 60));
         // allow keyboard focus so ESC and other keys work
         setFocusable(true);
+        // forward key events to our handler when this panel has focus
+        addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                handleKey(e);
+            }
+        });
         addMouseListener(this);
         addMouseMotionListener(this);
         timer = new javax.swing.Timer(16, this); // ~60fps
@@ -170,22 +177,22 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         if (now - lastZombieSpawn > spawnInterval) {
             lastZombieSpawn = now;
             int row = (int)(Math.random() * Constants.ROWS);
-            int zType;
+            ZombieType zType;
             double r = Math.random();
             if (wave <= 2) {
-                zType = Zombie.TEMPLATE_NORMAL;
+                zType = ZombieType.NORMAL;
             } else if (wave <= 4) {
-                zType = r < 0.75 ? Zombie.TEMPLATE_NORMAL : Zombie.TEMPLATE_FAST;
+                zType = r < 0.75 ? ZombieType.NORMAL : ZombieType.FAST;
             } else {
                 // wave >= 5: 15% Cherry, 55% Normal, 25% Fast, 5% Tank
                 if (r < 0.15) {
-                    zType = Zombie.TEMPLATE_CHERRY;
+                    zType = ZombieType.CHERRY;
                 } else if (r < 0.70) {
-                    zType = Zombie.TEMPLATE_NORMAL;
+                    zType = ZombieType.NORMAL;
                 } else if (r < 0.95) {
-                    zType = Zombie.TEMPLATE_FAST;
+                    zType = ZombieType.FAST;
                 } else {
-                    zType = Zombie.TEMPLATE_TANK;
+                    zType = ZombieType.TANK;
                 }
             }
             int maxLevel = Math.min(4, 1 + wave / 2);
@@ -196,16 +203,7 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
             double biased = Math.pow(rnd, biasFactor);
             int level = 1 + (int)(biased * maxLevel);
             level = Math.max(1, Math.min(level, maxLevel));
-            Zombie z;
-            if (zType == Zombie.TEMPLATE_FAST) {
-                z = new FastZombie(row, level);
-            } else if (zType == Zombie.TEMPLATE_TANK) {
-                z = new TankZombie(row, level);
-            } else if (zType == Zombie.TEMPLATE_CHERRY) {
-                z = new CherryZombie(row, level);
-            } else {
-                z = new NormalZombie(row, level);
-            }
+            Zombie z = zType.create(row, level);
             zombies.add(z);
             zombiesSpawnedThisWave++;
         }
@@ -459,8 +457,9 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         drawDecorativePlants(g);
 
         // Start button
-        drawButton(g, Constants.WINDOW_WIDTH / 2 - 100, 250, 200, 55,
-                new Color(60, 180, 60), new Color(40, 140, 40), "開始遊戲", Color.WHITE, 22);
+        int sbx = Constants.WINDOW_WIDTH / 2 - Constants.MENU_BTN_W / 2;
+        drawButton(g, sbx, Constants.MENU_BTN_Y, Constants.MENU_BTN_W, Constants.MENU_BTN_H,
+            new Color(60, 180, 60), new Color(40, 140, 40), "開始遊戲", Color.WHITE, 22);
 
         // Instructions
         g.setFont(new Font("Dialog", Font.PLAIN, 15));
@@ -881,8 +880,9 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         int mx = e.getX(), my = e.getY();
         // Menu start
         if (state == State.MENU) {
-            if (mx >= Constants.WINDOW_WIDTH / 2 - 100 && mx <= Constants.WINDOW_WIDTH / 2 + 100
-                    && my >= 250 && my <= 305) {
+            int sbx = Constants.WINDOW_WIDTH / 2 - Constants.MENU_BTN_W / 2;
+            if (mx >= sbx && mx <= sbx + Constants.MENU_BTN_W
+                    && my >= Constants.MENU_BTN_Y && my <= Constants.MENU_BTN_Y + Constants.MENU_BTN_H) {
                 startGame();
             }
             return;

@@ -16,14 +16,6 @@ public class GameWindow extends JFrame {
         setLocationRelativeTo(null);
         setResizable(false);
 
-        // Keyboard input
-        addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                gamePanel.handleKey(e);
-            }
-        });
-        gamePanel.setFocusable(true);
-        gamePanel.requestFocus();
+        // GamePanel handles its own key events and focus
     }
 }
