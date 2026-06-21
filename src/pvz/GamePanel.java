@@ -5,36 +5,23 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
 import java.util.List;
+import pvz.Plant.*;
+import pvz.Zombie.*;
 
-public class GamePanel extends JPanel implements ActionListener, MouseListener, MouseMotionListener {
+public class GamePanel extends JPanel {
 
     // ── Game state ─────────────────────────────────────────────────────────────
     public enum State { MENU, PLAYING, PAUSED, WIN, LOSE }
     private State state = State.MENU;
 
-    // ── Game objects ───────────────────────────────────────────────────────────
-    private final Plant[][]        grid       = new Plant[Constants.ROWS][Constants.COLS];
-    private final List<Zombie>     zombies    = new ArrayList<>();
-    private final List<Pea>        peas       = new ArrayList<>();
-    private final List<Sun>        suns       = new ArrayList<>();
-    private final List<Explosion>  explosions = new ArrayList<>();
-    private final List<FloatText>  floatTexts = new ArrayList<>();
+    // ── Game model (moved to GameWorld) ─────────────────────────────────────────
+    private final GameWorld world = new GameWorld();
 
-    // ── Resources ──────────────────────────────────────────────────────────────
-    private int sunCount = Constants.START_SUN;
-    private int wave     = 0;
-    private int maxWaves = 10;
-    private int zombiesKilled = 0;
-    private int zombiesPerWave = 5;
-
-    // ── Timing ─────────────────────────────────────────────────────────────────
-    private long lastSunFall;
-    private long lastZombieSpawn;
+    // ── Timing / UI ────────────────────────────────────────────────────────────
     private long lastUpdate;
     private long gameStartTime;
     private long pauseStart;
     private long totalPauseTime;
-    private int  zombiesSpawnedThisWave = 0;
 
     // ── Input ──────────────────────────────────────────────────────────────────
     private PlantType selectedPlant = null;
@@ -52,28 +39,77 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
     private Rectangle pauseBtnEndBounds = null;
     private Point     mousePos = new Point();
 
-    // ── Timer ──────────────────────────────────────────────────────────────────
-    private final javax.swing.Timer timer;
+    // ── Game engine (controls timer & update loop) ─────────────────────────────
+    private GameEngine engine;
 
     // ── Fonts ──────────────────────────────────────────────────────────────────
     private Font bigFont, medFont, smallFont;
+
+    // ── Window (merged from GameWindow) ────────────────────────────────────────
+    private JFrame frame;
 
     public GamePanel() {
         setPreferredSize(new Dimension(Constants.WINDOW_WIDTH, Constants.WINDOW_HEIGHT));
         setBackground(new Color(80, 140, 60));
         // allow keyboard focus so ESC and other keys work
         setFocusable(true);
-        // forward key events to our handler when this panel has focus
+        // attach extracted input listener
+        GameInputListener inputListener = new GameInputListener(this, world);
+        addMouseListener(inputListener);
+        addMouseMotionListener(inputListener);
+
+        // Keyboard input
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
                 handleKey(e);
             }
         });
-        addMouseListener(this);
-        addMouseMotionListener(this);
-        timer = new javax.swing.Timer(16, this); // ~60fps
+
+        // engine created after world is initialized
+        engine = new GameEngine(this, world);
         initFonts();
+        initWindow();
+    }
+
+    private void initWindow() {
+        frame = new JFrame("🌻 植物大戰殭屍 - Java Edition");
+        frame.add(this);
+        frame.pack();
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLocationRelativeTo(null);
+        frame.setResizable(false);
+    }
+
+    public JFrame getFrame() {
+        return frame;
+    }
+
+    // Exposed for GameEngine to inspect/control the state and timing
+    public State getState() { return state; }
+    public void setState(State s) { this.state = s; }
+    public GameWorld getWorld() { return world; }
+    public synchronized long getLastUpdate() { return lastUpdate; }
+    public synchronized void setLastUpdate(long v) { lastUpdate = v; }
+    // Expose small accessors used by input listener
+    public PlantType getSelectedPlant() { return selectedPlant; }
+    public void setSelectedPlant(PlantType p) { selectedPlant = p; }
+    public int getHoverCol() { return hoverCol; }
+    public int getHoverRow() { return hoverRow; }
+    public void setHoverColRow(int c, int r) { hoverCol = c; hoverRow = r; }
+    public int getSelectedTileCol() { return selectedTileCol; }
+    public int getSelectedTileRow() { return selectedTileRow; }
+    public void setSelectedTile(int c, int r) { selectedTileCol = c; selectedTileRow = r; }
+    public Rectangle getRemoveBtnBounds() { return removeBtnBounds; }
+    public void setRemoveBtnBounds(Rectangle r) { removeBtnBounds = r; }
+    public Point getMousePos() { return mousePos; }
+    public void setMousePos(Point p) { mousePos = p; }
+    public void stopEngine() { if (engine != null) engine.stop(); }
+    // prepare end-screen button rectangles (used by engine when game ends)
+    public void prepareEndScreenButtons() {
+        int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
+        endBtnRestartBounds = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
+        endBtnMenuBounds = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
     }
 
     private void initFonts() {
@@ -90,14 +126,7 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
 
     // ── Start / Reset ──────────────────────────────────────────────────────────
     public void startGame() {
-        for (Plant[] row : grid) Arrays.fill(row, null);
-        zombies.clear(); peas.clear(); suns.clear(); explosions.clear(); floatTexts.clear();
-        sunCount       = Constants.START_SUN;
-        wave           = 1;
-        zombiesKilled  = 0;
-        zombiesSpawnedThisWave = 0;
-        lastSunFall    = System.currentTimeMillis();
-        lastZombieSpawn= System.currentTimeMillis() + 3000;
+        world.start();
         lastUpdate     = System.currentTimeMillis();
         gameStartTime  = System.currentTimeMillis();
         totalPauseTime = 0;
@@ -109,316 +138,12 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         pauseBtnRestartBounds = null;
         pauseBtnEndBounds = null;
         state          = State.PLAYING;
-        timer.start();
+        engine.start();
         // ensure this panel has keyboard focus so ESC is received
         javax.swing.SwingUtilities.invokeLater(() -> requestFocusInWindow());
     }
 
-    // ── Main update ────────────────────────────────────────────────────────────
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        if (state != State.PLAYING) { repaint(); return; }
-
-        long now = System.currentTimeMillis();
-        double dt = (now - lastUpdate) / 1000.0;
-        if (dt > 0.1) dt = 0.1;
-        lastUpdate = now;
-
-        updateSuns(dt, now);
-        updateZombieSpawn(now);
-        updateZombies(dt, now);
-        updatePeas(dt);
-        updatePlants(now);
-        updateExplosions(dt);
-        updateFloatTexts();
-        checkCollisions();
-        checkWinLose(now);
-
-        repaint();
-    }
-
-    private void updateSuns(double dt, long now) {
-        // Sky sun drops
-        if (now - lastSunFall > Constants.SUN_FALL_INTERVAL) {
-            lastSunFall = now;
-            double sx = 80 + Math.random() * (Constants.WINDOW_WIDTH - 160);
-            double ty = 80 + Math.random() * (Constants.GRID_Y + Constants.ROWS * Constants.CELL_H - 160);
-            suns.add(new Sun(sx, -30, ty));
-        }
-        // Update
-        for (Sun s : suns) s.update(dt);
-        suns.removeIf(s -> s.collected || s.isExpired());
-    }
-
-    private void updateZombieSpawn(long now) {
-        if (wave > maxWaves) return;
-        int totalThisWave = zombiesPerWave + (wave - 1) * 2;
-        if (zombiesSpawnedThisWave >= totalThisWave) {
-            // Wait for all zombies to die, then next wave
-            if (zombies.isEmpty()) {
-                wave++;
-                zombiesSpawnedThisWave = 0;
-                // Every 3 waves, increase all zombies' base HP by 80
-                if (wave % 3 == 0) {
-                    Zombie.addGlobalHpBonus(80);
-                    addFloatText("All zombies +80 HP!", Constants.WINDOW_WIDTH / 2, 170,
-                            new Color(255, 140, 0), 20, 1800);
-                }
-                if (wave <= maxWaves) {
-                    addFloatText("第 " + wave + " 波！", Constants.WINDOW_WIDTH / 2, 200,
-                            new Color(255, 80, 80), 30, 2500);
-                    lastZombieSpawn = now + 1000;
-                }
-            }
-            return;
-        }
-
-        long spawnInterval = Math.max(2000, Constants.ZOMBIE_SPAWN_BASE - wave * 400L);
-        if (now - lastZombieSpawn > spawnInterval) {
-            lastZombieSpawn = now;
-            int row = (int)(Math.random() * Constants.ROWS);
-            ZombieType zType;
-            double r = Math.random();
-            if (wave <= 2) {
-                zType = ZombieType.NORMAL;
-            } else if (wave <= 4) {
-                zType = r < 0.75 ? ZombieType.NORMAL : ZombieType.FAST;
-            } else {
-                // wave >= 5: 15% Cherry, 55% Normal, 25% Fast, 5% Tank
-                if (r < 0.15) {
-                    zType = ZombieType.CHERRY;
-                } else if (r < 0.70) {
-                    zType = ZombieType.NORMAL;
-                } else if (r < 0.95) {
-                    zType = ZombieType.FAST;
-                } else {
-                    zType = ZombieType.TANK;
-                }
-            }
-            int maxLevel = Math.min(4, 1 + wave / 2);
-            // Bias selection so higher levels become more likely as waves increase.
-            // biasFactor == 1.0 => uniform; values <1 favor larger (higher) levels.
-            double biasFactor = Math.max(0.45, 1.0 - (wave - 1) * 0.06);
-            double rnd = Math.random();
-            double biased = Math.pow(rnd, biasFactor);
-            int level = 1 + (int)(biased * maxLevel);
-            level = Math.max(1, Math.min(level, maxLevel));
-            Zombie z = zType.create(row, level);
-            zombies.add(z);
-            zombiesSpawnedThisWave++;
-        }
-    }
-
-    private void updateZombies(double dt, long now) {
-        for (Zombie z : zombies) {
-            // Check if zombie has a plant to attack
-            Plant target = getPlantInFront(z);
-            if (target != null) {
-                z.attacking = true;
-                if (now - z.lastAttackTime > Constants.ZOMBIE_ATTACK_RATE) {
-                    z.lastAttackTime = now;
-                    int dmg = z.attackPower();
-                    target.hp -= dmg;
-                    addFloatText("-" + dmg, target.cx(), target.cy() - 10,
-                            new Color(220, 60, 60), 16, 700);
-                    if (target.isDead()) {
-                        grid[target.row][target.col] = null;
-                    }
-                }
-            } else {
-                z.attacking = false;
-            }
-            z.update(dt);
-        }
-    }
-
-    private Plant getPlantInFront(Zombie z) {
-        int col = (int)((z.x - Constants.GRID_X) / Constants.CELL_W);
-        if (col < 0) col = 0;
-        if (col >= Constants.COLS) return null;
-        return grid[z.row][col];
-    }
-
-    private void updatePeas(double dt) {
-        for (Pea p : peas) p.update(dt);
-        peas.removeIf(p -> p.dead);
-    }
-
-    private void updatePlants(long now) {
-        for (int r = 0; r < Constants.ROWS; r++) {
-            for (int c = 0; c < Constants.COLS; c++) {
-                Plant p = grid[r][c];
-                if (p == null) continue;
-
-                switch (p.type) {
-                    case PEASHOOTER -> {
-                        if (hasZombieInRow(r, c) && now - p.lastShootTime > Constants.SHOOT_INTERVAL) {
-                            p.lastShootTime = now;
-                            double px = p.cx() + 20;
-                            double py = p.cy();
-                            peas.add(new Pea(px, py, r, false));
-                        }
-                    }
-                    case SNOWPEA -> {
-                        if (hasZombieInRow(r, c) && now - p.lastShootTime > Constants.SHOOT_INTERVAL) {
-                            p.lastShootTime = now;
-                            peas.add(new Pea(p.cx() + 20, p.cy(), r, true));
-                        }
-                    }
-                    case SUNFLOWER -> {
-                        if (now - p.lastSunTime > Constants.SF_SUN_INTERVAL) {
-                            p.lastSunTime = now;
-                            suns.add(new Sun(p.cx(), p.cy() - 30));
-                        }
-                    }
-                    case CHERRYBOMB -> {
-                        if (!p.exploding) {
-                            p.exploding = true;
-                            p.explodeStartTime = now;
-                        }
-                        if (now - p.explodeStartTime > Constants.CHERRY_FUSE) {
-                            // Explode!
-                            explodeCherry(p);
-                            grid[r][c] = null;
-                        }
-                    }
-                    default -> {}
-                }
-            }
-        }
-    }
-
-    private boolean hasZombieInRow(int row, int fromCol) {
-        double minX = Constants.GRID_X + fromCol * Constants.CELL_W;
-        for (Zombie z : zombies) {
-            if (z.row == row && z.x > minX) return true;
-        }
-        return false;
-    }
-
-    private void explodeCherry(Plant p) {
-        int cx = p.cx(), cy = p.cy();
-        explosions.add(new Explosion(cx, cy, Constants.CHERRY_RADIUS));
-        addFloatText("💥 BOOM!", cx, cy - 30, new Color(255, 120, 0), 28, 1200);
-
-        // Damage all zombies in radius
-        Iterator<Zombie> it = zombies.iterator();
-        while (it.hasNext()) {
-            Zombie z = it.next();
-            int zx = (int)z.x + Zombie.ZOMBIE_W / 2;
-            int zy = z.getPixelY() + Zombie.ZOMBIE_H / 2;
-            double dist = Math.hypot(zx - cx, zy - cy);
-            if (dist <= Constants.CHERRY_RADIUS) {
-                z.hp -= Constants.CHERRY_DMG;
-                if (z.isDead()) {
-                    // handle special death effects (e.g., cherry zombie explosion)
-                    handleZombieDeathEffects(z);
-                    it.remove();
-                    zombiesKilled++;
-                    sunCount += 5;
-                }
-            }
-        }
-    }
-
-    private void updateExplosions(double dt) {
-        for (Explosion ex : explosions) ex.update(dt);
-        explosions.removeIf(ex -> ex.done);
-    }
-
-    private void updateFloatTexts() {
-        floatTexts.removeIf(ft -> System.currentTimeMillis() > ft.expireTime);
-        for (FloatText ft : floatTexts) ft.y -= 0.5;
-    }
-
-    private void checkCollisions() {
-        Iterator<Pea> pi = peas.iterator();
-        while (pi.hasNext()) {
-            Pea pea = pi.next();
-            boolean hit = false;
-            for (Zombie z : zombies) {
-                if (z.row == pea.row && pea.getBounds().intersects(z.getBounds())) {
-                    int dmg = pea.frozen ? Constants.SNOW_PEA_DMG : Constants.PEA_DMG;
-                    z.hp -= dmg;
-                    addFloatText("-" + dmg, (int)z.x + 20, z.getPixelY(),
-                            pea.frozen ? new Color(100, 200, 255) : new Color(100, 220, 100), 14, 500);
-                    if (pea.frozen) {
-                        z.speedFactor = Constants.SNOW_SLOW_FACTOR;
-                        z.slowUntil   = System.currentTimeMillis() + Constants.SLOW_DURATION;
-                    }
-                    if (z.isDead()) {
-                        zombiesKilled++;
-                        sunCount += 5;
-                        addFloatText("+5 ☀", (int)z.x + 20, z.getPixelY() - 10,
-                                new Color(255, 220, 0), 16, 800);
-                        // trigger death effects (like cherry zombie explosion)
-                        handleZombieDeathEffects(z);
-                    }
-                    hit = true;
-                    break;
-                }
-            }
-            if (hit) { pi.remove(); }
-            zombies.removeIf(Zombie::isDead);
-        }
-
-    }
-
-    private void handleZombieDeathEffects(Zombie z) {
-        if (z instanceof CherryZombie) {
-            int zx = (int)z.x + Zombie.ZOMBIE_W / 2;
-            int zy = z.getPixelY() + Zombie.ZOMBIE_H / 2;
-            // Explosion visual
-            explosions.add(new Explosion(zx, zy, Constants.CHERRY_ZOMBIE_RADIUS));
-            addFloatText("💥 BOOM!", zx, zy - 30, new Color(255, 120, 0), 28, 1200);
-
-            // Damage nearby plants
-            for (int r = 0; r < Constants.ROWS; r++) {
-                for (int c = 0; c < Constants.COLS; c++) {
-                    Plant p = grid[r][c];
-                    if (p == null) continue;
-                    double pdx = p.cx() - zx;
-                    double pdy = p.cy() - zy;
-                    double dist = Math.hypot(pdx, pdy);
-                    if (dist <= Constants.CHERRY_ZOMBIE_RADIUS) {
-                        p.hp -= Constants.CHERRY_ZOMBIE_DMG;
-                        if (p.isDead()) {
-                            grid[r][c] = null;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private void checkWinLose(long now) {
-        // Lose: zombie reaches left side
-        for (Zombie z : zombies) {
-            if (z.x < Constants.GRID_X - 40) {
-                if (state != State.LOSE) {
-                    state = State.LOSE;
-                    timer.stop();
-                    int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-                    endBtnRestartBounds = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                    endBtnMenuBounds = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                    // ensure the UI updates immediately
-                    repaint();
-                }
-                return;
-            }
-        }
-        // Win: survived all waves and no zombies left
-        if (wave > maxWaves && zombies.isEmpty()) {
-            if (state != State.WIN) {
-                state = State.WIN;
-                timer.stop();
-                int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-                endBtnRestartBounds = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                endBtnMenuBounds = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                repaint();
-            }
-        }
-    }
+    // Game updates are driven by GameEngine -> see src/pvz/GameEngine.java
 
     // ── Painting ───────────────────────────────────────────────────────────────
     @Override
@@ -457,9 +182,8 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         drawDecorativePlants(g);
 
         // Start button
-        int sbx = Constants.WINDOW_WIDTH / 2 - Constants.MENU_BTN_W / 2;
-        drawButton(g, sbx, Constants.MENU_BTN_Y, Constants.MENU_BTN_W, Constants.MENU_BTN_H,
-            new Color(60, 180, 60), new Color(40, 140, 40), "開始遊戲", Color.WHITE, 22);
+        drawButton(g, Constants.WINDOW_WIDTH / 2 - 100, 250, 200, 55,
+                new Color(60, 180, 60), new Color(40, 140, 40), "開始遊戲", Color.WHITE, 22);
 
         // Instructions
         g.setFont(new Font("Dialog", Font.PLAIN, 15));
@@ -516,25 +240,25 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         // Plants
         for (int r = 0; r < Constants.ROWS; r++)
             for (int c = 0; c < Constants.COLS; c++)
-                if (grid[r][c] != null) grid[r][c].draw(g);
+                if (world.grid[r][c] != null) world.grid[r][c].draw(g);
 
         // Remove-button overlay for selected deployed tile
         drawRemoveButton(g);
 
         // Peas
-        for (Pea p : peas) p.draw(g);
+        for (Pea p : world.peas) p.draw(g);
 
         // Zombies
-        for (Zombie z : zombies) z.draw(g);
+        for (Zombie z : world.zombies) z.draw(g);
 
         // Suns
-        for (Sun s : suns) s.draw(g);
+        for (Sun s : world.suns) s.draw(g);
 
         // Explosions
-        for (Explosion ex : explosions) ex.draw(g);
+        for (Explosion ex : world.explosions) ex.draw(g);
 
         // Float texts
-        for (FloatText ft : floatTexts) ft.draw(g);
+        for (FloatText ft : world.floatTexts) ft.draw(g);
 
         // Hover preview
         drawHoverPreview(g);
@@ -583,7 +307,7 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         if (hoverCol >= 0 && hoverRow >= 0 && selectedPlant != null) {
             int hx = Constants.GRID_X + hoverCol * Constants.CELL_W;
             int hy = Constants.GRID_Y + hoverRow * Constants.CELL_H;
-            boolean canPlace = grid[hoverRow][hoverCol] == null && sunCount >= selectedPlant.cost;
+            boolean canPlace = world.grid[hoverRow][hoverCol] == null && world.sunCount >= selectedPlant.cost;
             g.setColor(canPlace ? new Color(255, 255, 100, 80) : new Color(255, 60, 60, 80));
             g.fillRect(hx, hy, Constants.CELL_W, Constants.CELL_H);
             g.setColor(canPlace ? new Color(255, 255, 0, 160) : new Color(255, 0, 0, 160));
@@ -621,7 +345,7 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         }
         g.setColor(new Color(255, 220, 30));
         g.setFont(new Font("Dialog", Font.BOLD, 22));
-        String sunStr = String.valueOf(sunCount);
+        String sunStr = String.valueOf(world.sunCount);
         FontMetrics fm = g.getFontMetrics();
         g.drawString(sunStr, 59 - fm.stringWidth(sunStr) / 2, 90);
         g.setFont(new Font("Dialog", Font.PLAIN, 11));
@@ -635,7 +359,7 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
             int ix = Constants.SHOP_START_X + i * (Constants.SHOP_ITEM_W + 8);
             int iy = Constants.SHOP_Y + 5;
             boolean selected  = selectedPlant == pt;
-            boolean affordable = sunCount >= pt.cost;
+            boolean affordable = world.sunCount >= pt.cost;
             // Card
             Color cardBg = selected ? new Color(255, 240, 100) : affordable ? new Color(60, 100, 50) : new Color(40, 60, 35);
             g.setColor(cardBg);
@@ -670,16 +394,16 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         }
 
         // Right side: wave info
-        g.setColor(new Color(255, 220, 150));
+        g.setColor(new Color(0, 100, 0));
         g.setFont(new Font("Dialog", Font.BOLD, 14));
-        String waveStr = "第 " + Math.min(wave, maxWaves) + "/" + maxWaves + " 波";
+        String waveStr = "第 " + Math.min(world.wave, world.maxWaves) + "/" + world.maxWaves + " 波";
         g.drawString(waveStr, 780, 40);
-        g.setColor(new Color(180, 220, 150));
+        g.setColor(new Color(0, 100, 0));
         g.setFont(new Font("Dialog", Font.PLAIN, 13));
-        g.drawString("消滅: " + zombiesKilled, 780, 60);
+        g.drawString("消滅: " + world.zombiesKilled, 780, 60);
 
         // ESC hint
-        g.setColor(new Color(180, 200, 170));
+        g.setColor(new Color(0, 100, 0));
         g.setFont(new Font("Dialog", Font.PLAIN, 12));
         g.drawString("[ESC] 暫停", 780, 95);
     }
@@ -750,7 +474,7 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
             return;
         }
         // If tile no longer has a plant, hide
-        if (grid[selectedTileRow][selectedTileCol] == null) {
+        if (world.grid[selectedTileRow][selectedTileCol] == null) {
             selectedTileCol = selectedTileRow = -1;
             removeBtnBounds = null;
             return;
@@ -848,7 +572,7 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         fm = g.getFontMetrics();
         g.drawString(sub, (Constants.WINDOW_WIDTH - fm.stringWidth(sub)) / 2, 285);
 
-        String stat = "消滅殭屍: " + zombiesKilled + " 個  |  到達第 " + Math.min(wave, maxWaves) + " 波";
+        String stat = "消滅殭屍: " + world.zombiesKilled + " 個  |  到達第 " + Math.min(world.wave, world.maxWaves) + " 波";
         g.setFont(new Font("Dialog", Font.PLAIN, 18));
         fm = g.getFontMetrics();
         g.drawString(stat, (Constants.WINDOW_WIDTH - fm.stringWidth(stat)) / 2, 325);
@@ -874,176 +598,7 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         g.drawString(text, x + (w - fm.stringWidth(text)) / 2, y + h / 2 + fm.getAscent() / 2 - 2);
     }
 
-    // ── Mouse events ───────────────────────────────────────────────────────────
-    @Override
-    public void mouseClicked(MouseEvent e) {
-        int mx = e.getX(), my = e.getY();
-        // Menu start
-        if (state == State.MENU) {
-            int sbx = Constants.WINDOW_WIDTH / 2 - Constants.MENU_BTN_W / 2;
-            if (mx >= sbx && mx <= sbx + Constants.MENU_BTN_W
-                    && my >= Constants.MENU_BTN_Y && my <= Constants.MENU_BTN_Y + Constants.MENU_BTN_H) {
-                startGame();
-            }
-            return;
-        }
-
-        // Pause menu clicks
-        if (state == State.PAUSED) {
-            if (pauseBtnContinueBounds != null && pauseBtnContinueBounds.contains(mx, my)) {
-                state = State.PLAYING;
-                totalPauseTime += System.currentTimeMillis() - pauseStart;
-                lastUpdate = System.currentTimeMillis();
-                pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
-                repaint();
-            } else if (pauseBtnRestartBounds != null && pauseBtnRestartBounds.contains(mx, my)) {
-                startGame();
-                repaint();
-            } else if (pauseBtnEndBounds != null && pauseBtnEndBounds.contains(mx, my)) {
-                state = State.LOSE;
-                timer.stop();
-                int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-                endBtnRestartBounds = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                endBtnMenuBounds = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
-                repaint();
-            }
-            return;
-        }
-
-        // End screen buttons (use drawn bounds for accuracy)
-        if (state == State.WIN || state == State.LOSE) {
-            if (endBtnRestartBounds != null && endBtnRestartBounds.contains(mx, my)) {
-                startGame();
-                repaint();
-            } else if (endBtnMenuBounds != null && endBtnMenuBounds.contains(mx, my)) {
-                state = State.MENU;
-                timer.stop();
-                // clear button bounds when returning to menu
-                endBtnRestartBounds = null;
-                endBtnMenuBounds = null;
-                repaint();
-            }
-            return;
-        }
-    }
-    @Override public void mouseEntered(MouseEvent e) {}
-    @Override public void mouseExited(MouseEvent e) {}
-    @Override public void mouseDragged(MouseEvent e) {}
-
-    @Override
-    public void mouseMoved(MouseEvent e) {
-        mousePos = e.getPoint();
-        int mx = e.getX(), my = e.getY();
-        int newCol = (mx - Constants.GRID_X) / Constants.CELL_W;
-        int newRow = (my - Constants.GRID_Y) / Constants.CELL_H;
-        if (newCol < 0 || newCol >= Constants.COLS || newRow < 0 || newRow >= Constants.ROWS) {
-            hoverCol = hoverRow = -1;
-            // if we had a selected tile, cancel it when mouse leaves grid
-            if (selectedTileCol >= 0) {
-                selectedTileCol = selectedTileRow = -1;
-                removeBtnBounds = null;
-            }
-            return;
-        }
-        hoverCol = newCol;
-        hoverRow = newRow;
-        // If we've previously clicked to show the overlay and now moved outside that tile, cancel it
-        if (selectedTileCol >= 0 && (hoverCol != selectedTileCol || hoverRow != selectedTileRow)) {
-            selectedTileCol = selectedTileRow = -1;
-            removeBtnBounds = null;
-        }
-    }
-
-    @Override
-    public void mousePressed(MouseEvent e) {
-        int mx = e.getX(), my = e.getY();
-
-        // menu and end-screen clicks handled in mouseClicked to ensure clicks register
-
-        if (state == State.PAUSED) {
-            // Do not auto-resume on arbitrary clicks; pause menu handles clicks explicitly
-            return;
-        }
-
-        if (state != State.PLAYING) return;
-
-        // Right click: deselect
-        if (e.getButton() == MouseEvent.BUTTON3) {
-            selectedPlant = null;
-            return;
-        }
-
-        // If remove-button is visible and clicked -> remove plant
-        if (removeBtnBounds != null && removeBtnBounds.contains(mx, my)) {
-            if (selectedTileRow >= 0 && selectedTileCol >= 0 && grid[selectedTileRow][selectedTileCol] != null) {
-                grid[selectedTileRow][selectedTileCol] = null;
-                addFloatText("已移除植物", mx, my - 10, new Color(255, 200, 100), 16, 800);
-            }
-            selectedTileRow = selectedTileCol = -1;
-            removeBtnBounds = null;
-            return;
-        }
-
-        // Check sun collection
-        for (Sun s : suns) {
-            if (s.getBounds().contains(mx, my)) {
-                s.collected = true;
-                sunCount += Constants.SUN_VALUE;
-                addFloatText("+25 ☀", mx, my, new Color(255, 230, 50), 18, 900);
-                return;
-            }
-        }
-
-        // Check shop clicks
-        PlantType[] types = PlantType.values();
-        for (int i = 0; i < types.length; i++) {
-            int ix = Constants.SHOP_START_X + i * (Constants.SHOP_ITEM_W + 8);
-            int iy = Constants.SHOP_Y + 5;
-            if (mx >= ix && mx <= ix + Constants.SHOP_ITEM_W && my >= iy && my <= iy + Constants.SHOP_ITEM_H) {
-                if (sunCount >= types[i].cost) {
-                    selectedPlant = types[i];
-                }
-                return;
-            }
-        }
-
-        // Grid placement (hover controls remove-overlay visibility)
-        int clickedCol = (mx - Constants.GRID_X) / Constants.CELL_W;
-        int clickedRow = (my - Constants.GRID_Y) / Constants.CELL_H;
-        boolean clickedOnGrid = clickedCol >= 0 && clickedCol < Constants.COLS && clickedRow >= 0 && clickedRow < Constants.ROWS;
-
-        if (selectedPlant != null && clickedOnGrid) {
-            if (grid[clickedRow][clickedCol] == null && sunCount >= selectedPlant.cost) {
-                Plant newPlant = switch (selectedPlant) {
-                    case SUNFLOWER -> new Sunflower(clickedCol, clickedRow);
-                    case PEASHOOTER -> new Peashooter(clickedCol, clickedRow);
-                    case WALLNUT -> new Wallnut(clickedCol, clickedRow);
-                    case SNOWPEA -> new SnowPea(clickedCol, clickedRow);
-                    case CHERRYBOMB -> new CherryBomb(clickedCol, clickedRow);
-                };
-                grid[clickedRow][clickedCol] = newPlant;
-                sunCount -= selectedPlant.cost;
-                addFloatText("-" + selectedPlant.cost + " ☀", mx, my - 20,
-                        new Color(220, 180, 50), 16, 800);
-                // Keep selected for rapid planting (deselect cherry bomb after place)
-                if (selectedPlant == PlantType.CHERRYBOMB) selectedPlant = null;
-            }
-        } else if (clickedOnGrid) {
-            // Click-to-show overlay: if clicking an occupied tile, show remove/X button.
-            if (grid[clickedRow][clickedCol] != null) {
-                selectedTileCol = clickedCol;
-                selectedTileRow = clickedRow;
-            } else {
-                // clicked empty tile -> cancel any shown overlay
-                selectedTileCol = selectedTileRow = -1;
-                removeBtnBounds = null;
-            }
-        }
-    }
-
-    @Override
-    public void mouseReleased(MouseEvent e) {}
+    // Mouse input handling has been moved to pvz.GameInputListener
 
     // ── Keyboard ───────────────────────────────────────────────────────────────
     public void handleKey(KeyEvent e) {
@@ -1070,32 +625,37 @@ public class GamePanel extends JPanel implements ActionListener, MouseListener, 
         }
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
-    private void addFloatText(String text, int x, int y, Color color, int size, int duration) {
-        floatTexts.add(new FloatText(text, x, y, color, size,
-                System.currentTimeMillis() + duration));
+    // Helper methods for the input listener to control pause/resume flows
+    public void enterPauseMenu() {
+        state = State.PAUSED;
+        pauseStart = System.currentTimeMillis();
+        int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
+        pauseBtnContinueBounds = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y, Constants.END_BTN_W, Constants.END_BTN_H);
+        pauseBtnRestartBounds  = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP, Constants.END_BTN_W, Constants.END_BTN_H);
+        pauseBtnEndBounds      = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP * 2, Constants.END_BTN_W, Constants.END_BTN_H);
+        repaint();
     }
 
-    // ── Inner: FloatText ───────────────────────────────────────────────────────
-    static class FloatText {
-        String text; double x, y; Color color; int size; long expireTime;
-        FloatText(String text, double x, double y, Color color, int size, long expireTime) {
-            this.text = text; this.x = x; this.y = y;
-            this.color = color; this.size = size; this.expireTime = expireTime;
-        }
-        void draw(Graphics2D g) {
-            long remaining = expireTime - System.currentTimeMillis();
-            float alpha = remaining / 400f;
-            alpha = Math.max(0f, Math.min(1f, alpha));
-            Composite old = g.getComposite();
-            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
-            g.setFont(new Font("Dialog", Font.BOLD, size));
-            int alphaInt = Math.max(0, Math.min(255, (int)(120 * alpha)));
-            g.setColor(new Color(0, 0, 0, alphaInt));
-            g.drawString(text, (int) x + 2, (int) y + 2);
-            g.setColor(color);
-            g.drawString(text, (int) x, (int) y);
-            g.setComposite(old);
-        }
+    public void resumeFromPause() {
+        state = State.PLAYING;
+        totalPauseTime += System.currentTimeMillis() - pauseStart;
+        lastUpdate = System.currentTimeMillis();
+        pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
+        repaint();
     }
+
+    public void endGameFromPauseAsLose() {
+        state = State.LOSE;
+        if (engine != null) engine.stop();
+        prepareEndScreenButtons();
+        pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
+        repaint();
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    private void addFloatText(String text, int x, int y, Color color, int size, int duration) {
+        world.addFloatText(text, x, y, color, size, duration);
+    }
+
+    // FloatText was moved to its own file: pvz/FloatText.java
 }
