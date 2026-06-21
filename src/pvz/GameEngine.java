@@ -46,14 +46,12 @@ public class GameEngine {
             if (panel.getState() != GamePanel.State.LOSE) {
                 panel.setState(GamePanel.State.LOSE);
                 stop();
-                panel.prepareEndScreenButtons();
                 panel.repaint();
             }
         } else if (res == GameWorld.UpdateResult.WIN) {
             if (panel.getState() != GamePanel.State.WIN) {
                 panel.setState(GamePanel.State.WIN);
                 stop();
-                panel.prepareEndScreenButtons();
                 panel.repaint();
             }
         } else {
@@ -61,4 +59,3 @@ public class GameEngine {
         }
     }
 }
-

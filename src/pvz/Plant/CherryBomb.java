@@ -3,10 +3,23 @@ package pvz.Plant;
 import java.awt.*;
 import pvz.PlantType;
 import pvz.Constants;
+import pvz.GameWorld;
 
 public class CherryBomb extends Plant {
     public CherryBomb(int col, int row) {
         super(PlantType.CHERRYBOMB, col, row, PlantType.CHERRYBOMB.maxHp, Constants.CHERRY_DMG, 'C');
+    }
+
+    @Override
+    public void update(GameWorld world, long now) {
+        if (!exploding) {
+            exploding = true;
+            explodeStartTime = now;
+        }
+        if (now - explodeStartTime > Constants.CHERRY_FUSE) {
+            world.explodeCherry(this);
+            world.removePlant(row, col);
+        }
     }
 
     @Override
@@ -49,19 +62,6 @@ public class CherryBomb extends Plant {
         g.fillOval(cx + 1,  cy - 10, 3, 3);
         g.fillOval(cx + 7,  cy - 10, 3, 3);
 
-        // HP bar
-        int barW = w - 10;
-        int barH = 6;
-        int bx   = x + 5;
-        int by   = y + h - 12;
-        g.setColor(Color.DARK_GRAY);
-        g.fillRect(bx, by, barW, barH);
-        float ratio = (float) hp / type.maxHp;
-        g.setColor(ratio > 0.5f ? new Color(80, 200, 80)
-                 : ratio > 0.25f ? new Color(220, 180, 0)
-                 : new Color(200, 60, 60));
-        g.fillRect(bx, by, (int)(barW * ratio), barH);
-        g.setColor(Color.BLACK);
-        g.drawRect(bx, by, barW, barH);
+        drawHpBar(g);
     }
 }

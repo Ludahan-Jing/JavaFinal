@@ -45,19 +45,6 @@ public class Wallnut extends Plant {
             g.drawArc(cx - 7, cy + 4, 14, 8, 0, 180); // sad face when dying
         }
 
-        // HP bar
-        int barW = w - 10;
-        int barH = 6;
-        int bx   = x + 5;
-        int by   = y + h - 12;
-        g.setColor(Color.DARK_GRAY);
-        g.fillRect(bx, by, barW, barH);
-        float ratio2 = (float) hp / type.maxHp;
-        g.setColor(ratio2 > 0.5f ? new Color(80, 200, 80)
-                 : ratio2 > 0.25f ? new Color(220, 180, 0)
-                 : new Color(200, 60, 60));
-        g.fillRect(bx, by, (int)(barW * ratio2), barH);
-        g.setColor(Color.BLACK);
-        g.drawRect(bx, by, barW, barH);
+        drawHpBar(g);
     }
 }

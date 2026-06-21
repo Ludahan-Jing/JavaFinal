@@ -1,18 +1,29 @@
 package pvz;
 
 import java.awt.*;
+import pvz.Plant.*;
 
 public enum PlantType {
     SUNFLOWER("向日葵", Constants.SUNFLOWER_COST, Constants.SUNFLOWER_HP,
-            new Color(255, 220, 0), new Color(255, 180, 0)),
+            new Color(255, 220, 0), new Color(255, 180, 0)) {
+        @Override public Plant create(int col, int row) { return new Sunflower(col, row); }
+    },
     PEASHOOTER("豌豆射手", Constants.PEASHOOTER_COST, Constants.PEASHOOTER_HP,
-            new Color(60, 180, 60), new Color(30, 140, 30)),
+            new Color(60, 180, 60), new Color(30, 140, 30)) {
+        @Override public Plant create(int col, int row) { return new Peashooter(col, row); }
+    },
     WALLNUT("堅果牆", Constants.WALLNUT_COST, Constants.WALLNUT_HP,
-            new Color(180, 120, 50), new Color(140, 90, 30)),
+            new Color(180, 120, 50), new Color(140, 90, 30)) {
+        @Override public Plant create(int col, int row) { return new Wallnut(col, row); }
+    },
     SNOWPEA("寒冰射手", Constants.SNOWPEA_COST, Constants.SNOWPEA_HP,
-            new Color(100, 200, 255), new Color(50, 150, 220)),
+            new Color(100, 200, 255), new Color(50, 150, 220)) {
+        @Override public Plant create(int col, int row) { return new SnowPea(col, row); }
+    },
     CHERRYBOMB("櫻桃炸彈", Constants.CHERRYBOMB_COST, Constants.CHERRYBOMB_HP,
-            new Color(220, 50, 50), new Color(180, 20, 20));
+            new Color(220, 50, 50), new Color(180, 20, 20)) {
+        @Override public Plant create(int col, int row) { return new CherryBomb(col, row); }
+    };
 
     public final String name;
     public final int cost;
@@ -27,4 +38,7 @@ public enum PlantType {
         this.color     = color;
         this.darkColor = darkColor;
     }
+
+    /** Factory method: each constant builds its own Plant instance. */
+    public abstract Plant create(int col, int row);
 }

@@ -3,10 +3,22 @@ package pvz.Plant;
 import java.awt.*;
 import pvz.PlantType;
 import pvz.Constants;
+import pvz.GameWorld;
+import pvz.Pea;
 
 public class Peashooter extends Plant {
     public Peashooter(int col, int row) {
         super(PlantType.PEASHOOTER, col, row, PlantType.PEASHOOTER.maxHp, Constants.PEA_DMG, 'P');
+    }
+
+    @Override
+    public void update(GameWorld world, long now) {
+        if (world.hasZombieInRow(row, col) && now - lastShootTime > Constants.SHOOT_INTERVAL) {
+            lastShootTime = now;
+            double px = cx() + 20;
+            double py = cy();
+            world.peas.add(new Pea(px, py, row, false));
+        }
     }
 
     @Override
@@ -41,19 +53,6 @@ public class Peashooter extends Plant {
         int[] ly = {cy + 10, cy + 20, cy + 25};
         g.fillPolygon(lx, ly, 3);
 
-        // HP bar
-        int barW = w - 10;
-        int barH = 6;
-        int bx   = x + 5;
-        int by   = y + h - 12;
-        g.setColor(Color.DARK_GRAY);
-        g.fillRect(bx, by, barW, barH);
-        float ratio = (float) hp / type.maxHp;
-        g.setColor(ratio > 0.5f ? new Color(80, 200, 80)
-                 : ratio > 0.25f ? new Color(220, 180, 0)
-                 : new Color(200, 60, 60));
-        g.fillRect(bx, by, (int)(barW * ratio), barH);
-        g.setColor(Color.BLACK);
-        g.drawRect(bx, by, barW, barH);
+        drawHpBar(g);
     }
 }

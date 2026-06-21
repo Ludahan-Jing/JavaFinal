@@ -28,15 +28,10 @@ public class GamePanel extends JPanel {
     private int       hoverCol = -1, hoverRow = -1;
     // Selected deployed tile (for showing remove button)
     private int       selectedTileCol = -1, selectedTileRow = -1;
-    // Bounds for the remove (X) button
+    // Bounds for the remove (X) button — dynamic, tracks the selected grid tile
     private Rectangle removeBtnBounds = null;
-    // Bounds for end-screen buttons (restart / main menu)
-    private Rectangle endBtnRestartBounds = null;
-    private Rectangle endBtnMenuBounds = null;
-    // Bounds for pause-menu buttons
-    private Rectangle pauseBtnContinueBounds = null;
-    private Rectangle pauseBtnRestartBounds = null;
-    private Rectangle pauseBtnEndBounds = null;
+    // Static button bounds (menu/pause/end-screen) now come from UiLayout instead
+    // of being recomputed and cached here in up to four different places.
     private Point     mousePos = new Point();
 
     // ── Game engine (controls timer & update loop) ─────────────────────────────
@@ -105,12 +100,6 @@ public class GamePanel extends JPanel {
     public Point getMousePos() { return mousePos; }
     public void setMousePos(Point p) { mousePos = p; }
     public void stopEngine() { if (engine != null) engine.stop(); }
-    // prepare end-screen button rectangles (used by engine when game ends)
-    public void prepareEndScreenButtons() {
-        int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-        endBtnRestartBounds = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-        endBtnMenuBounds = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-    }
 
     private void initFonts() {
         bigFont   = new Font("微軟正黑體", Font.BOLD, 48);
@@ -131,12 +120,6 @@ public class GamePanel extends JPanel {
         gameStartTime  = System.currentTimeMillis();
         totalPauseTime = 0;
         selectedPlant  = null;
-        // clear end-screen and pause-menu button bounds
-        endBtnRestartBounds = null;
-        endBtnMenuBounds = null;
-        pauseBtnContinueBounds = null;
-        pauseBtnRestartBounds = null;
-        pauseBtnEndBounds = null;
         state          = State.PLAYING;
         engine.start();
         // ensure this panel has keyboard focus so ESC is received
@@ -182,7 +165,8 @@ public class GamePanel extends JPanel {
         drawDecorativePlants(g);
 
         // Start button
-        drawButton(g, Constants.WINDOW_WIDTH / 2 - 100, 250, 200, 55,
+        Rectangle startBtn = UiLayout.menuStartButton();
+        drawButton(g, startBtn.x, startBtn.y, startBtn.width, startBtn.height,
                 new Color(60, 180, 60), new Color(40, 140, 40), "開始遊戲", Color.WHITE, 22);
 
         // Instructions
@@ -532,27 +516,23 @@ public class GamePanel extends JPanel {
         fm = g.getFontMetrics();
         g.drawString(hint, (Constants.WINDOW_WIDTH - fm.stringWidth(hint)) / 2, 300);
 
-        int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-        // ensure pause button rects exist (created when pausing, but fallback here)
-        if (pauseBtnContinueBounds == null) {
-            pauseBtnContinueBounds = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-            pauseBtnRestartBounds = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP, Constants.END_BTN_W, Constants.END_BTN_H);
-            pauseBtnEndBounds     = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP * 2, Constants.END_BTN_W, Constants.END_BTN_H);
-        }
+        Rectangle continueBtn = UiLayout.pauseContinueButton();
+        Rectangle restartBtn  = UiLayout.pauseRestartButton();
+        Rectangle endBtn      = UiLayout.pauseEndButton();
 
         // Continue
-        Color contFill = pauseBtnContinueBounds.contains(mousePos) ? new Color(90, 210, 90) : new Color(60, 160, 60);
-        drawButton(g, pauseBtnContinueBounds.x, pauseBtnContinueBounds.y, pauseBtnContinueBounds.width, pauseBtnContinueBounds.height,
+        Color contFill = continueBtn.contains(mousePos) ? new Color(90, 210, 90) : new Color(60, 160, 60);
+        drawButton(g, continueBtn.x, continueBtn.y, continueBtn.width, continueBtn.height,
             contFill, new Color(40, 120, 40), "繼續遊戲", Color.WHITE, 20);
 
         // Restart
-        Color rstFill = pauseBtnRestartBounds.contains(mousePos) ? new Color(255, 200, 80) : new Color(200, 140, 0);
-        drawButton(g, pauseBtnRestartBounds.x, pauseBtnRestartBounds.y, pauseBtnRestartBounds.width, pauseBtnRestartBounds.height,
+        Color rstFill = restartBtn.contains(mousePos) ? new Color(255, 200, 80) : new Color(200, 140, 0);
+        drawButton(g, restartBtn.x, restartBtn.y, restartBtn.width, restartBtn.height,
             rstFill, new Color(150, 100, 10), "重新開始", Color.WHITE, 20);
 
         // End Game
-        Color endFill = pauseBtnEndBounds.contains(mousePos) ? new Color(240, 100, 100) : new Color(200, 60, 60);
-        drawButton(g, pauseBtnEndBounds.x, pauseBtnEndBounds.y, pauseBtnEndBounds.width, pauseBtnEndBounds.height,
+        Color endFill = endBtn.contains(mousePos) ? new Color(240, 100, 100) : new Color(200, 60, 60);
+        drawButton(g, endBtn.x, endBtn.y, endBtn.width, endBtn.height,
             endFill, new Color(140, 30, 30), "結束遊戲", Color.WHITE, 20);
     }
 
@@ -577,10 +557,11 @@ public class GamePanel extends JPanel {
         fm = g.getFontMetrics();
         g.drawString(stat, (Constants.WINDOW_WIDTH - fm.stringWidth(stat)) / 2, 325);
 
-        int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-        drawButton(g, bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H,
+        Rectangle restartBtn = UiLayout.endScreenRestartButton();
+        Rectangle menuBtn    = UiLayout.endScreenMenuButton();
+        drawButton(g, restartBtn.x, restartBtn.y, restartBtn.width, restartBtn.height,
             new Color(60, 160, 60), new Color(40, 120, 40), "再玩一次", Color.WHITE, 22);
-        drawButton(g, bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H,
+        drawButton(g, menuBtn.x, menuBtn.y, menuBtn.width, menuBtn.height,
             new Color(100, 60, 160), new Color(70, 40, 120), "返回主選單", Color.WHITE, 22);
     }
 
@@ -604,35 +585,17 @@ public class GamePanel extends JPanel {
     public void handleKey(KeyEvent e) {
         if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
             if (state == State.PLAYING) {
-                // Enter pause menu
-                state = State.PAUSED;
-                pauseStart = System.currentTimeMillis();
-                int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-                pauseBtnContinueBounds = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-                pauseBtnRestartBounds  = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP, Constants.END_BTN_W, Constants.END_BTN_H);
-                pauseBtnEndBounds      = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP * 2, Constants.END_BTN_W, Constants.END_BTN_H);
-                repaint();
+                enterPauseMenu();
             } else if (state == State.PAUSED) {
-                // Resume game
-                state = State.PLAYING;
-                totalPauseTime += System.currentTimeMillis() - pauseStart;
-                lastUpdate = System.currentTimeMillis();
-                pauseBtnContinueBounds = null;
-                pauseBtnRestartBounds = null;
-                pauseBtnEndBounds = null;
-                repaint();
+                resumeFromPause();
             }
         }
     }
 
-    // Helper methods for the input listener to control pause/resume flows
+    // Helper methods for the input listener (and ESC key) to control pause/resume flows
     public void enterPauseMenu() {
         state = State.PAUSED;
         pauseStart = System.currentTimeMillis();
-        int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-        pauseBtnContinueBounds = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-        pauseBtnRestartBounds  = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP, Constants.END_BTN_W, Constants.END_BTN_H);
-        pauseBtnEndBounds      = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP * 2, Constants.END_BTN_W, Constants.END_BTN_H);
         repaint();
     }
 
@@ -640,15 +603,12 @@ public class GamePanel extends JPanel {
         state = State.PLAYING;
         totalPauseTime += System.currentTimeMillis() - pauseStart;
         lastUpdate = System.currentTimeMillis();
-        pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
         repaint();
     }
 
     public void endGameFromPauseAsLose() {
         state = State.LOSE;
         if (engine != null) engine.stop();
-        prepareEndScreenButtons();
-        pauseBtnContinueBounds = null; pauseBtnRestartBounds = null; pauseBtnEndBounds = null;
         repaint();
     }
 

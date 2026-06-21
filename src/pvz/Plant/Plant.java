@@ -38,4 +38,43 @@ public abstract class Plant {
     public int cy() { return Constants.GRID_Y + row * Constants.CELL_H + Constants.CELL_H / 2; }
 
     public abstract void draw(Graphics2D g);
+
+    /**
+     * Per-tick behavior hook (shooting, sun production, fuse timers, etc).
+     * Default is no-op — most plants (e.g. Wallnut) don't need this.
+     * Subclasses with active behavior override this instead of GameWorld
+     * branching on plant type.
+     *
+     * @param world the game world (gives access to peas/suns lists and helpers)
+     * @param now   current time in millis, passed down so all plants use one timestamp
+     */
+    public void update(pvz.GameWorld world, long now) {
+        // no-op by default
+    }
+
+    /**
+     * Shared HP bar rendering, used by all plant subclasses.
+     * Anchored to this plant's grid cell, same look as before per-subclass.
+     */
+    protected void drawHpBar(Graphics2D g) {
+        int x = Constants.GRID_X + col * Constants.CELL_W;
+        int y = Constants.GRID_Y + row * Constants.CELL_H;
+        int w = Constants.CELL_W;
+        int h = Constants.CELL_H;
+
+        int barW = w - 10;
+        int barH = 6;
+        int bx   = x + 5;
+        int by   = y + h - 12;
+
+        g.setColor(Color.DARK_GRAY);
+        g.fillRect(bx, by, barW, barH);
+        float ratio = (float) hp / type.maxHp;
+        g.setColor(ratio > 0.5f ? new Color(80, 200, 80)
+                 : ratio > 0.25f ? new Color(220, 180, 0)
+                 : new Color(200, 60, 60));
+        g.fillRect(bx, by, (int) (barW * ratio), barH);
+        g.setColor(Color.BLACK);
+        g.drawRect(bx, by, barW, barH);
+    }
 }

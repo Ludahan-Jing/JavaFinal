@@ -3,10 +3,20 @@ package pvz.Plant;
 import java.awt.*;
 import pvz.PlantType;
 import pvz.Constants;
+import pvz.GameWorld;
+import pvz.Sun;
 
 public class Sunflower extends Plant {
     public Sunflower(int col, int row) {
         super(PlantType.SUNFLOWER, col, row, PlantType.SUNFLOWER.maxHp, 0, 'S');
+    }
+
+    @Override
+    public void update(GameWorld world, long now) {
+        if (now - lastSunTime > Constants.SF_SUN_INTERVAL) {
+            lastSunTime = now;
+            world.suns.add(new Sun(cx(), cy() - 30));
+        }
     }
 
     @Override
@@ -40,19 +50,6 @@ public class Sunflower extends Plant {
         g.drawLine(cx, cy + 14, cx, cy + 40);
         g.setStroke(new BasicStroke(1));
 
-        // HP bar
-        int barW = w - 10;
-        int barH = 6;
-        int bx   = x + 5;
-        int by   = y + h - 12;
-        g.setColor(Color.DARK_GRAY);
-        g.fillRect(bx, by, barW, barH);
-        float ratio = (float) hp / type.maxHp;
-        g.setColor(ratio > 0.5f ? new Color(80, 200, 80)
-                 : ratio > 0.25f ? new Color(220, 180, 0)
-                 : new Color(200, 60, 60));
-        g.fillRect(bx, by, (int)(barW * ratio), barH);
-        g.setColor(Color.BLACK);
-        g.drawRect(bx, by, barW, barH);
+        drawHpBar(g);
     }
 }

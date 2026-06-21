@@ -21,24 +21,19 @@ public class GameInputListener implements MouseListener, MouseMotionListener {
 
         // Menu start
         if (state == GamePanel.State.MENU) {
-            if (mx >= Constants.WINDOW_WIDTH / 2 - 100 && mx <= Constants.WINDOW_WIDTH / 2 + 100
-                    && my >= 250 && my <= 305) {
+            if (UiLayout.menuStartButton().contains(mx, my)) {
                 panel.startGame();
             }
             return;
         }
 
-        // Pause menu clicks - compute bounds locally (consistent with GamePanel)
+        // Pause menu clicks
         if (state == GamePanel.State.PAUSED) {
-            int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-            Rectangle cont = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-            Rectangle rst  = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP, Constants.END_BTN_W, Constants.END_BTN_H);
-            Rectangle end  = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP * 2, Constants.END_BTN_W, Constants.END_BTN_H);
-            if (cont.contains(mx, my)) {
+            if (UiLayout.pauseContinueButton().contains(mx, my)) {
                 panel.resumeFromPause();
-            } else if (rst.contains(mx, my)) {
+            } else if (UiLayout.pauseRestartButton().contains(mx, my)) {
                 panel.startGame();
-            } else if (end.contains(mx, my)) {
+            } else if (UiLayout.pauseEndButton().contains(mx, my)) {
                 panel.endGameFromPauseAsLose();
             }
             return;
@@ -46,12 +41,9 @@ public class GameInputListener implements MouseListener, MouseMotionListener {
 
         // End screen buttons
         if (state == GamePanel.State.WIN || state == GamePanel.State.LOSE) {
-            int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
-            Rectangle restart = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-            Rectangle menuBtn  = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
-            if (restart.contains(mx, my)) {
+            if (UiLayout.endScreenRestartButton().contains(mx, my)) {
                 panel.startGame();
-            } else if (menuBtn.contains(mx, my)) {
+            } else if (UiLayout.endScreenMenuButton().contains(mx, my)) {
                 panel.setState(GamePanel.State.MENU);
                 panel.stopEngine();
                 // clear any end screen state silently
@@ -151,13 +143,7 @@ public class GameInputListener implements MouseListener, MouseMotionListener {
         PlantType sel = panel.getSelectedPlant();
         if (sel != null && clickedOnGrid) {
             if (world.grid[clickedRow][clickedCol] == null && world.sunCount >= sel.cost) {
-                Plant newPlant = switch (sel) {
-                    case SUNFLOWER -> new Sunflower(clickedCol, clickedRow);
-                    case PEASHOOTER -> new Peashooter(clickedCol, clickedRow);
-                    case WALLNUT -> new Wallnut(clickedCol, clickedRow);
-                    case SNOWPEA -> new SnowPea(clickedCol, clickedRow);
-                    case CHERRYBOMB -> new CherryBomb(clickedCol, clickedRow);
-                };
+                Plant newPlant = sel.create(clickedCol, clickedRow);
                 world.grid[clickedRow][clickedCol] = newPlant;
                 world.sunCount -= sel.cost;
                 world.addFloatText("-" + sel.cost + " ☀", mx, my - 20,
@@ -179,5 +165,3 @@ public class GameInputListener implements MouseListener, MouseMotionListener {
 
     @Override public void mouseReleased(MouseEvent e) {}
 }
-
-

@@ -194,44 +194,12 @@ public class GameWorld {
             for (int c = 0; c < Constants.COLS; c++) {
                 Plant p = grid[r][c];
                 if (p == null) continue;
-                switch (p.type) {
-                    case PEASHOOTER -> {
-                        if (hasZombieInRow(r, c) && now - p.lastShootTime > Constants.SHOOT_INTERVAL) {
-                            p.lastShootTime = now;
-                            double px = p.cx() + 20;
-                            double py = p.cy();
-                            peas.add(new Pea(px, py, r, false));
-                        }
-                    }
-                    case SNOWPEA -> {
-                        if (hasZombieInRow(r, c) && now - p.lastShootTime > Constants.SHOOT_INTERVAL) {
-                            p.lastShootTime = now;
-                            peas.add(new Pea(p.cx() + 20, p.cy(), r, true));
-                        }
-                    }
-                    case SUNFLOWER -> {
-                        if (now - p.lastSunTime > Constants.SF_SUN_INTERVAL) {
-                            p.lastSunTime = now;
-                            suns.add(new Sun(p.cx(), p.cy() - 30));
-                        }
-                    }
-                    case CHERRYBOMB -> {
-                        if (!p.exploding) {
-                            p.exploding = true;
-                            p.explodeStartTime = now;
-                        }
-                        if (now - p.explodeStartTime > Constants.CHERRY_FUSE) {
-                            explodeCherry(p);
-                            grid[r][c] = null;
-                        }
-                    }
-                    default -> {}
-                }
+                p.update(this, now);
             }
         }
     }
 
-    private boolean hasZombieInRow(int row, int fromCol) {
+    public boolean hasZombieInRow(int row, int fromCol) {
         double minX = Constants.GRID_X + fromCol * Constants.CELL_W;
         for (Zombie z : zombies) {
             if (z.row == row && z.x > minX) return true;
@@ -239,7 +207,7 @@ public class GameWorld {
         return false;
     }
 
-    private void explodeCherry(Plant p) {
+    public void explodeCherry(Plant p) {
         int cx = p.cx(), cy = p.cy();
         explosions.add(new Explosion(cx, cy, Constants.CHERRY_RADIUS));
         addFloatText("💥 BOOM!", cx, cy - 30, new Color(255, 120, 0), 28, 1200);
@@ -331,6 +299,9 @@ public class GameWorld {
     public void addFloatText(String text, int x, int y, Color color, int size, int duration) {
         floatTexts.add(new FloatText(text, x, y, color, size, System.currentTimeMillis() + duration));
     }
+
+    /** Removes the plant at (row, col) from the grid, if present. */
+    public void removePlant(int row, int col) {
+        grid[row][col] = null;
+    }
 }
-
-
