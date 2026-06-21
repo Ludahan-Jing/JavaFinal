@@ -3,7 +3,7 @@ echo Compiling Plants vs Zombies...
 if not exist out mkdir out
 
 REM Compile all Java sources under src (including subpackages)
-javac -encoding UTF-8 -d out -sourcepath src src\pvz\*.java src\pvz\Plant\*.java src\pvz\Zombie\*.java
+javac -encoding UTF-8 -d out -sourcepath src src\pvz\*.java src\pvz\Plant\*.java src\pvz\Zombie\*.java src\pvz\state\*.java
 
 if %errorlevel% == 0 (
     echo Compilation successful!

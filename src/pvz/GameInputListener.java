@@ -4,6 +4,7 @@ import java.awt.*;
 import java.awt.event.*;
 import pvz.Plant.*;
 import pvz.Zombie.*;
+import pvz.state.*;
 
 public class GameInputListener implements MouseListener, MouseMotionListener {
     private final GamePanel panel;
@@ -17,10 +18,9 @@ public class GameInputListener implements MouseListener, MouseMotionListener {
     @Override
     public void mouseClicked(MouseEvent e) {
         int mx = e.getX(), my = e.getY();
-        GamePanel.State state = panel.getState();
+        GameState state = panel.getGameState();
 
-        // Menu start
-        if (state == GamePanel.State.MENU) {
+        if (state instanceof MenuState) {
             if (mx >= Constants.WINDOW_WIDTH / 2 - 100 && mx <= Constants.WINDOW_WIDTH / 2 + 100
                     && my >= 250 && my <= 305) {
                 panel.startGame();
@@ -28,8 +28,7 @@ public class GameInputListener implements MouseListener, MouseMotionListener {
             return;
         }
 
-        // Pause menu clicks - compute bounds locally (consistent with GamePanel)
-        if (state == GamePanel.State.PAUSED) {
+        if (state instanceof PausedState) {
             int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
             Rectangle cont = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y, Constants.END_BTN_W, Constants.END_BTN_H);
             Rectangle rst  = new Rectangle(bx, Constants.PAUSE_BTN_FIRST_Y + Constants.PAUSE_BTN_GAP, Constants.END_BTN_W, Constants.END_BTN_H);
@@ -44,18 +43,14 @@ public class GameInputListener implements MouseListener, MouseMotionListener {
             return;
         }
 
-        // End screen buttons
-        if (state == GamePanel.State.WIN || state == GamePanel.State.LOSE) {
+        if (state instanceof WinState || state instanceof LoseState) {
             int bx = Constants.WINDOW_WIDTH / 2 - Constants.END_BTN_HALF_WIDTH;
             Rectangle restart = new Rectangle(bx, Constants.END_BTN_RESTART_Y, Constants.END_BTN_W, Constants.END_BTN_H);
             Rectangle menuBtn  = new Rectangle(bx, Constants.END_BTN_MENU_Y, Constants.END_BTN_W, Constants.END_BTN_H);
             if (restart.contains(mx, my)) {
                 panel.startGame();
             } else if (menuBtn.contains(mx, my)) {
-                panel.setState(GamePanel.State.MENU);
-                panel.stopEngine();
-                // clear any end screen state silently
-                panel.repaint();
+                panel.goToMenu();
             }
             return;
         }
@@ -91,14 +86,14 @@ public class GameInputListener implements MouseListener, MouseMotionListener {
     @Override
     public void mousePressed(MouseEvent e) {
         int mx = e.getX(), my = e.getY();
-        GamePanel.State state = panel.getState();
+        GameState state = panel.getGameState();
 
-        if (state == GamePanel.State.PAUSED) {
+        if (state instanceof PausedState) {
             // Do not auto-resume on arbitrary clicks; pause menu handles clicks explicitly
             return;
         }
 
-        if (state != GamePanel.State.PLAYING) return;
+        if (!(state instanceof PlayingState)) return;
 
         // Right click: deselect
         if (e.getButton() == MouseEvent.BUTTON3) {
@@ -179,5 +174,3 @@ public class GameInputListener implements MouseListener, MouseMotionListener {
 
     @Override public void mouseReleased(MouseEvent e) {}
 }
-
-
