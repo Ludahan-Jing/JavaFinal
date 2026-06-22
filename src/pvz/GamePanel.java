@@ -3,8 +3,6 @@ package pvz;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.*;
-import java.util.List;
 import pvz.Plant.*;
 import pvz.Zombie.*;
 
@@ -19,9 +17,6 @@ public class GamePanel extends JPanel {
 
     // ── Timing / UI ────────────────────────────────────────────────────────────
     private long lastUpdate;
-    private long gameStartTime;
-    private long pauseStart;
-    private long totalPauseTime;
 
     // ── Input ──────────────────────────────────────────────────────────────────
     private PlantType selectedPlant = null;
@@ -38,7 +33,7 @@ public class GamePanel extends JPanel {
     private GameEngine engine;
 
     // ── Fonts ──────────────────────────────────────────────────────────────────
-    private Font bigFont, medFont, smallFont;
+    private Font bigFont;
 
     // ── Window (merged from GameWindow) ────────────────────────────────────────
     private JFrame frame;
@@ -103,13 +98,9 @@ public class GamePanel extends JPanel {
 
     private void initFonts() {
         bigFont   = new Font("微軟正黑體", Font.BOLD, 48);
-        medFont   = new Font("微軟正黑體", Font.BOLD, 24);
-        smallFont = new Font("微軟正黑體", Font.PLAIN, 14);
         // fallback
         if (!bigFont.getFamily().equals("微軟正黑體")) {
             bigFont   = new Font("Dialog", Font.BOLD, 48);
-            medFont   = new Font("Dialog", Font.BOLD, 24);
-            smallFont = new Font("Dialog", Font.PLAIN, 14);
         }
     }
 
@@ -117,8 +108,6 @@ public class GamePanel extends JPanel {
     public void startGame() {
         world.start();
         lastUpdate     = System.currentTimeMillis();
-        gameStartTime  = System.currentTimeMillis();
-        totalPauseTime = 0;
         selectedPlant  = null;
         state          = State.PLAYING;
         engine.start();
@@ -595,13 +584,11 @@ public class GamePanel extends JPanel {
     // Helper methods for the input listener (and ESC key) to control pause/resume flows
     public void enterPauseMenu() {
         state = State.PAUSED;
-        pauseStart = System.currentTimeMillis();
         repaint();
     }
 
     public void resumeFromPause() {
         state = State.PLAYING;
-        totalPauseTime += System.currentTimeMillis() - pauseStart;
         lastUpdate = System.currentTimeMillis();
         repaint();
     }
@@ -611,11 +598,4 @@ public class GamePanel extends JPanel {
         if (engine != null) engine.stop();
         repaint();
     }
-
-    // ── Helpers ────────────────────────────────────────────────────────────────
-    private void addFloatText(String text, int x, int y, Color color, int size, int duration) {
-        world.addFloatText(text, x, y, color, size, duration);
-    }
-
-    // FloatText was moved to its own file: pvz/FloatText.java
 }

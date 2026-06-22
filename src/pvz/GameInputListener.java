@@ -3,7 +3,6 @@ package pvz;
 import java.awt.*;
 import java.awt.event.*;
 import pvz.Plant.*;
-import pvz.Zombie.*;
 
 public class GameInputListener implements MouseListener, MouseMotionListener {
     private final GamePanel panel;
