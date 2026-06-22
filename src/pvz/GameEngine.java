@@ -1,8 +1,5 @@
 package pvz;
 
-import javax.swing.*;
-import java.awt.event.*;
-
 /**
  * GameEngine controls the main game loop (Swing Timer) and drives the
  * game state updates by calling GameWorld.update(dt). It delegates
