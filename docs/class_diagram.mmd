@@ -1,231 +1,307 @@
----
-title: PVZ Java Project - Class Diagram
-id: 070665e6-403d-4adb-b448-c3f54d65cb16
----
 classDiagram
-    %% Core Controller & UI Loop Package
-        class Main {
-            +main(String[] args)$ void
-        }
+direction TB
 
-        class GamePanel {
-            -State state
-            -GameWorld world
-            -GameEngine engine
-            -GameInputListener inputListener
-            -JFrame frame
-            -long lastUpdate
-            -PlantType selectedPlant
-            -int hoverCol
-            -int hoverRow
-            -int selectedTileCol
-            -int selectedTileRow
-            -Rectangle removeBtnBounds
-            -Point mousePos
-            +startGame() void
-            +enterPauseMenu() void
-            +resumeFromPause() void
-            +endGameFromPauseAsLose() void
-            +handleKey(KeyEvent e) void
-            #paintComponent(Graphics g) void
-        }
+%% ── Swing host ──────────────────────────────────────────────
+class GamePanel {
+  +State state
+  -GameWorld world
+  -UiSelectionState uiState
+  -GameRenderer renderer
+  -GameEngine engine
+  -long lastUpdate
+  -long pauseStart
+  +startGame()
+  +enterPauseMenu()
+  +resumeFromPause()
+  +endGameFromPauseAsLose()
+  +handleKey(KeyEvent)
+}
 
-        class GameEngine {
-            -GamePanel panel
-            -GameWorld world
-            -Timer timer
-            +start() void
-            +stop() void
-            -tick() void
-        }
+class GameEngine {
+  -GamePanel panel
+  -GameWorld world
+  -Timer timer
+  +start()
+  +stop()
+  -tick()
+}
 
-        class GameInputListener {
-            -GamePanel panel
-            -GameWorld world
-            +mouseClicked(MouseEvent e) void
-            +mouseMoved(MouseEvent e) void
-            +mouseDragged(MouseEvent e) void
-            +mousePressed(MouseEvent e) void
-        }
+class GameRenderer {
+  -GameWorld world
+  -UiSelectionState ui
+  +render(Graphics2D, State)
+  -drawMenu(Graphics2D)
+  -drawGame(Graphics2D)
+  -drawShop(Graphics2D)
+  -drawHUD(Graphics2D)
+  -drawPauseOverlay(Graphics2D)
+  -drawEndScreen(Graphics2D, boolean)
+}
 
-        class GameWorld {
-            +Plant[][] grid
-            +List~Zombie~ zombies
-            +List~Pea~ peas
-            +List~Sun~ suns
-            +List~Explosion~ explosions
-            +List~FloatText~ floatTexts
-            +int sunCount
-            +int wave
-            +int maxWaves
-            +int zombiesKilled
-            +update(double dt) UpdateResult
-            +spawnZombieWave() void
-            +explodeCherry(CherryBomb cb) void
-            +hasZombieInRow(int row, int col) boolean
-        }
+class GameInputListener {
+  -GamePanel panel
+  -GameWorld world
+  -UiSelectionState ui
+  +mouseClicked(MouseEvent)
+  +mousePressed(MouseEvent)
+  +mouseMoved(MouseEvent)
+}
 
-        class Constants {
-            <<utility>>
-            +int WINDOW_WIDTH$
-            +int WINDOW_HEIGHT$
-            +int ROWS$
-            +int COLS$
-            +int CELL_W$
-            +int CELL_H$
-        }
+class UiSelectionState {
+  -PlantType selectedPlant
+  -int hoverCol
+  -int hoverRow
+  -int selectedTileCol
+  -int selectedTileRow
+  -Rectangle removeBtnBounds
+  -Point mousePos
+  +getSelectedPlant() PlantType
+  +setSelectedPlant(PlantType)
+  +setHoverColRow(int, int)
+  +setSelectedTile(int, int)
+  +setRemoveBtnBounds(Rectangle)
+  +setMousePos(Point)
+  +clearSelectedPlant()
+}
 
-        class UiLayout {
-            <<utility>>
-            +menuStartButton()$ Rectangle
-            +endScreenRestartButton()$ Rectangle
-            +pauseContinueButton()$ Rectangle
-        }
+class UiLayout {
+  <<utility>>
+  +menuStartButton()$ Rectangle
+  +endScreenRestartButton()$ Rectangle
+  +endScreenMenuButton()$ Rectangle
+  +pauseContinueButton()$ Rectangle
+  +pauseRestartButton()$ Rectangle
+  +pauseEndButton()$ Rectangle
+}
 
-        class PlantType {
-            <<enumeration>>
-            SUNFLOWER
-            PEASHOOTER
-            WALLNUT
-            SNOWPEA
-            CHERRYBOMB
-            +String name
-            +int cost
-            +int maxHp
-            +create(int col, int row)* Plant
-        }
+class Constants {
+  <<constants>>
+  +WINDOW_WIDTH$ int
+  +WINDOW_HEIGHT$ int
+  +COLS$ int
+  +ROWS$ int
+  +CELL_W$ int
+  +CELL_H$ int
+  +SUN_VALUE$ int
+  +PEA_DMG$ int
+  +SNOW_PEA_DMG$ int
+  +CHERRY_DMG$ int
+  +CHERRY_FUSE$ int
+  +ZOMBIE_SPEED$ int
+}
 
-        class ZombieType {
-            <<enumeration>>
-            NORMAL
-            FAST
-            TANK
-            CHERRY
-            +char idChar
-            +int baseHp
-            +double baseSpeed
-            +create(int row, int level)* Zombie
-        }
+%% ── Model ───────────────────────────────────────────────────
+class GameWorld {
+  +Plant[][] grid
+  +List~Zombie~ zombies
+  +List~Pea~ peas
+  +List~Sun~ suns
+  +List~Explosion~ explosions
+  +List~FloatText~ floatTexts
+  +int sunCount
+  +int wave
+  +int maxWaves
+  +int zombiesKilled
+  +start()
+  +update(double) UpdateResult
+  +hasZombieInRow(int, int) boolean
+  +explodeCherry(Plant)
+  +removePlant(int, int)
+  +addFloatText(String, int, int, Color, int, int)
+}
 
-        class Pea {
-            +double x
-            +double y
-            +int row
-            +boolean frozen
-            +boolean dead
-            +update(double dt) void
-            +draw(Graphics2D g) void
-            +getBounds() Rectangle
-        }
+%% ── Plant hierarchy ─────────────────────────────────────────
+class Plant {
+  <<abstract>>
+  +PlantType type
+  +int col
+  +int row
+  +int hp
+  +int baseHp
+  +int baseAttack
+  +char idChar
+  +long lastShootTime
+  +long lastSunTime
+  +boolean exploding
+  +isDead() boolean
+  +cx() int
+  +cy() int
+  +update(GameWorld, long)*
+  +draw(Graphics2D)*
+  #drawHpBar(Graphics2D)
+}
 
-        class Sun {
-            +double x
-            +double y
-            +double targetY
-            +boolean falling
-            +long spawnTime
-            +update(double dt) void
-            +draw(Graphics2D g) void
-            +isExpired() boolean
-        }
+class Sunflower {
+  +update(GameWorld, long)
+  +draw(Graphics2D)
+}
 
-        class Explosion {
-            +double x
-            +double y
-            +int radius
-            +boolean done
-            +update(double dt) void
-            +draw(Graphics2D g) void
-        }
+class Peashooter {
+  +update(GameWorld, long)
+  +draw(Graphics2D)
+}
 
-        class FloatText {
-            ~String text
-            ~double x
-            ~double y
-            ~Color color
-            ~int size
-            ~long expireTime
-            +draw(Graphics2D g) void
-        }
+class SnowPea {
+  +update(GameWorld, long)
+  +draw(Graphics2D)
+}
 
-        class Plant {
-            <<abstract>>
-            +PlantType type
-            +int col
-            +int row
-            +int hp
-            +int baseHp
-            +int baseAttack
-            +char idChar
-            +placedTime long
-            +isDead() boolean
-            +update(GameWorld world, long now) void
-            +draw(Graphics2D g)* void
-            #drawHpBar(Graphics2D g) void
-        }
-        class Sunflower
-        class Peashooter
-        class Wallnut
-        class SnowPea
-        class CherryBomb
+class Wallnut {
+  +draw(Graphics2D)
+}
 
-        class Zombie {
-            <<abstract>>
-            +int row
-            +double x
-            +int hp
-            +int maxHp
-            +int level
-            +boolean attacking
-            +double speedFactor
-            +long slowUntil
-            +isDead() boolean
-            +update(double dt) void
-            +draw(Graphics2D g)* void
-            +getPixelY() int
-            #drawHpBar(Graphics2D g, int px, int py) void
-        }
-        class NormalZombie
-        class FastZombie
-        class TankZombie
-        class CherryZombie
+class CherryBomb {
+  +update(GameWorld, long)
+  +draw(Graphics2D)
+}
 
+class PlantType {
+  <<enumeration>>
+  SUNFLOWER
+  PEASHOOTER
+  WALLNUT
+  SNOWPEA
+  CHERRYBOMB
+  +String name
+  +int cost
+  +int maxHp
+  +Color color
+  +create(int, int)* Plant
+}
 
-    %% Architecture Dependency & Structural Mappings
-    Main ..> GamePanel : Instantiates
-    
-    GamePanel *--> GameWorld : Aggregates model
-    GamePanel *--> GameEngine : Owns loop agent
-    GamePanel *--> GameInputListener : Dispatches pointer inputs
-    
-    GameEngine --> GamePanel : Updates state flags / repaints UI
-    GameEngine --> GameWorld : Drives periodic tick delta updates
-    
-    GameInputListener --> GamePanel : Mutates selection indexes & overlays
-    GameInputListener --> GameWorld : Resolves resource collection / plant positioning
+%% ── Zombie hierarchy ────────────────────────────────────────
+class Zombie {
+  <<abstract>>
+  +int row
+  +double x
+  +int hp
+  +int maxHp
+  +int level
+  +double speedFactor
+  +long slowUntil
+  +boolean attacking
+  -globalHpBonus$ int
+  +isDead() boolean
+  +update(double)
+  +attackPower() int
+  +draw(Graphics2D)*
+  #drawHpBar(Graphics2D)
+  #drawLegsAndShoes(Graphics2D, int, int, Color, int)
+  #drawShadow(Graphics2D, int, int)
+  +resetGlobalHpBonus()$
+  +addGlobalHpBonus(int)$
+}
 
-    %% Collections Managed by the GameWorld Container
-    GameWorld "1" o--> "*" Plant : Tracks grid array cells
-    GameWorld "1" o--> "*" Zombie : Manages lane lists
-    GameWorld "1" o--> "*" Pea : Steps projectiles
-    GameWorld "1" o--> "*" Sun : Pools resource objects
-    GameWorld "1" o--> "*" Explosion : Ticks custom animations
-    GameWorld "1" o--> "*" FloatText : Displays dynamic state labels
+class NormalZombie {
+  +draw(Graphics2D)
+}
 
-    %% Object Factories / Blueprints
-    Plant --> PlantType : Tracks design template properties
-    Zombie --> ZombieType : Tracks design template properties
-    PlantType ..> Plant : Creates
-    ZombieType ..> Zombie : Creates
+class FastZombie {
+  +draw(Graphics2D)
+}
 
-    %% Inheritances
-    Plant <|-- Sunflower
-    Plant <|-- Peashooter
-    Plant <|-- Wallnut
-    Plant <|-- SnowPea
-    Plant <|-- CherryBomb
+class TankZombie {
+  +draw(Graphics2D)
+}
 
-    Zombie <|-- NormalZombie
-    Zombie <|-- FastZombie
-    Zombie <|-- TankZombie
-    Zombie <|-- CherryZombie
+class CherryZombie {
+  +draw(Graphics2D)
+}
+
+class ZombieType {
+  <<enumeration>>
+  NORMAL
+  FAST
+  TANK
+  CHERRY
+  +char idChar
+  +int baseHp
+  +double baseSpeed
+  +create(int, int)* Zombie
+}
+
+%% ── Game object value types ─────────────────────────────────
+class Pea {
+  +double x
+  +double y
+  +int row
+  +boolean frozen
+  +boolean dead
+  +update(double)
+  +getBounds() Rectangle
+  +draw(Graphics2D)
+}
+
+class Sun {
+  +double x
+  +double y
+  +boolean falling
+  +boolean collected
+  +update(double)
+  +isExpired() boolean
+  +getBounds() Rectangle
+  +draw(Graphics2D)
+}
+
+class Explosion {
+  +double x
+  +double y
+  +int radius
+  +boolean done
+  +update(double)
+  +draw(Graphics2D)
+}
+
+class FloatText {
+  +String text
+  +double x
+  +double y
+  +Color color
+  +long expireTime
+  +draw(Graphics2D)
+}
+
+%% ── Relationships ───────────────────────────────────────────
+
+%% GamePanel composition
+GamePanel "1" *-- "1" GameWorld
+GamePanel "1" *-- "1" UiSelectionState
+GamePanel "1" *-- "1" GameRenderer
+GamePanel "1" *-- "1" GameEngine
+GamePanel "1" *-- "1" GameInputListener
+
+%% Engine / renderer / input wiring
+GameEngine --> GamePanel : controls
+GameRenderer --> GameWorld : reads
+GameRenderer --> UiSelectionState : reads
+GameRenderer ..> UiLayout : uses
+GameInputListener --> GameWorld : mutates
+GameInputListener --> UiSelectionState : owns
+GameInputListener ..> UiLayout : uses
+
+%% GameWorld aggregates game objects
+GameWorld "1" o-- "0..*" Pea
+GameWorld "1" o-- "0..*" Sun
+GameWorld "1" o-- "0..*" Explosion
+GameWorld "1" o-- "0..*" FloatText
+GameWorld "1" o-- "0..*" Zombie
+GameWorld "1" *-- "0..45" Plant
+
+%% Plant hierarchy
+Plant <|-- Sunflower
+Plant <|-- Peashooter
+Plant <|-- SnowPea
+Plant <|-- Wallnut
+Plant <|-- CherryBomb
+Plant --> PlantType : type
+Plant ..> GameWorld : update uses
+
+%% PlantType factory
+PlantType ..> Plant : creates
+
+%% Zombie hierarchy
+Zombie <|-- NormalZombie
+Zombie <|-- FastZombie
+Zombie <|-- TankZombie
+Zombie <|-- CherryZombie
+ZombieType ..> Zombie : creates
